@@ -93,6 +93,7 @@ class MemberRules:
         self.to_comm = [Rule(r) for r in data["二、执委栏移到筹委栏"]["规则"]]
         self.comm_joiners = [w for w in data["二、执委栏移到筹委栏"].get("拆开连接词") or [] if w]
         self.to_role = [Rule(r) for r in data["三、筹委栏移到执委栏"]["规则"]]
+        self.team_to_role = [Rule(r) for r in (data.get("三之二、团内工作栏移到执委栏") or {}).get("规则") or []]
         self.roles = [Rule(r) for r in data["四、职位归类"]["规则"]]
         t = data["四、职位归类"]["标准职称"]
         self.titles_side = list(t.get("有正副") or [])
@@ -124,6 +125,9 @@ class MemberRules:
     # ---- 二 / 三
     def moves_to_comm(self, text) -> bool:
         return any(r.match(text) for r in self.to_comm)
+
+    def team_to_role_match(self, text) -> bool:
+        return any(r.match(text) for r in self.team_to_role)
 
     def moves_to_role(self, text) -> bool:
         return any(r.match(text) for r in self.to_role) and not self.moves_to_comm(text)
@@ -229,7 +233,7 @@ def known_roles(students):
                 else:
                     continue
                 if b.get("mv", {}).get("role") and b["mv"]["role"][i]:
-                    info["备注"] = "原写在筹委栏"
+                    info["备注"] = "原写在团内工作栏" if b["mv"]["role"][i] == "team" else "原写在筹委栏"
                 add(t, info, club)
             moved = set(b.get("movedComm") or [])
             for i, t in enumerate(b["cats"].get("comm", [])):

@@ -86,38 +86,30 @@ class Awards(unittest.TestCase):
 
 
 class Work(unittest.TestCase):
-    """资料总览的「工作」（config/work.json）"""
+    """资料总览的「活动 / 工作」（维护者 2026-09-28 重新定义）：服务栏 = 工作；比赛和服务以外的栏目一律 = 活动"""
 
-    def judge(self, text, cat="intSvc"):
+    def test_kind(self):
         from achievement import work_rules
-        return work_rules.get().judge(text, cat)[0]
+        W = work_rules.get()
+        for k in ("intSvc", "extSvc"):
+            self.assertEqual(W.kind(k), 1, k)
+        for k in ("intAct", "extAct", "team", "badge", "honor"):
+            self.assertEqual(W.kind(k), 3, k)
+        for k in ("extComp", "intComp", "role", "comm"):
+            self.assertEqual(W.kind(k), 0, k)
 
-    def test_routine_not_work(self):
-        self.assertFalse(self.judge("参与周会站岗服务"))          # 维护者：周会每个月都有，算例常
-        self.assertFalse(self.judge("例常早操服务（2小时）"))
-        self.assertTrue(self.judge("周会演出"))                   # 周会上的演出是特殊的
-
-    def test_special_is_work(self):
-        self.assertTrue(self.judge("校园大扫除（5小时）"))
-        self.assertTrue(self.judge("文娱汇演《聚星》——演员", "team"))
-        self.assertTrue(self.judge("接待台湾永平高中交流团", "extAct"))   # 活动栏的接待改算工作
-        self.assertFalse(self.judge("参与台湾交流会", "extAct"))          # 活动栏的交流 → 活动
-
-    def test_performance_in_activity_is_work(self):
-        self.assertTrue(self.judge("2026 年文东文化交流演出活动 —— 演员。", "extAct"))
-        self.assertFalse(self.judge("观看《颂》天地人和民族乐团演出。", "extAct"))   # 观看 → 还是活动
-
-    def test_same_work_once_per_year(self):
-        # 同一年搬椅子写了 5 次 → 只算 1 个工作；不同年份各算
-        svc = ["%d/6 搬椅子服务（1小时）" % d for d in range(1, 6)] + ["校园开放日服务"]
-        blk = lambda y: {"year": y, "clubCode": "A01", "clubName": "学长团", "exBlock": None, "hours": 6,
-                         "cats": {"intSvc": list(svc)}}
-        s = {"sid": "1", "blocks": [blk(2025), blk(2026)]}
+    def test_counts(self):
+        # 以前的条件（例常、同一年同一项只算 1 个、营员、参与者……）全部取消：每一条都算
+        blk = {"year": 2026, "clubCode": "A01", "clubName": "学长团", "exBlock": None, "hours": 6,
+               "cats": {"intSvc": ["周会站岗服务", "搬椅子服务", "搬椅子服务（2）"], "extSvc": ["捐血运动"],
+                        "team": ["集训营——营员", "高三欢送会参与者"], "extAct": ["观看音乐会"], "badge": ["考获专章"],
+                        "extComp": ["全国赛——冠军"]}}
+        s = {"sid": "1", "blocks": [blk]}
         rules.compute_exclusions(s)
-        for y in (2025, 2026):
-            st, _ = rules.compute_stats(s, {}, y)
-            self.assertEqual(st["work"], 2)
-            self.assertEqual(st["intSvc"], 6)        # 服务条数、时数照算
+        st, _ = rules.compute_stats(s, {}, 2026)
+        self.assertEqual(st["work"], 4)
+        self.assertEqual(st["acts"], 4)
+        self.assertEqual(st["extComp"], 1)
 
     def test_same_competition_each_year(self):
         # 不同比赛底下都写「自选南棍—第一名」：同一年同一栏重复出现，各自计算（吴则融 20390）
@@ -183,7 +175,7 @@ class Reference2025(unittest.TestCase):
         R = member_rules.get()
         for t in ("高三编辑工委", "担任教师节工委副主席", "工委：教师节师生赛工委——总务", "毕业特刊编辑工委会--查账"):
             self.assertTrue(R.exclusion(t, "role"), t)
-        self.assertIsNone(R.exclusion("编辑小组专题组组员", "role"))
+        self.assertNotIn("毕联会", R.exclusion("编辑小组专题组组员", "role") or "")   # 2026-09-28 起组员另外不计
 
     def test_hours_move_to_comm(self):
         R = member_rules.get()
@@ -246,6 +238,214 @@ class SupervisorReply20260925(unittest.TestCase):
         self.assertTrue(A.comp_judge("参与K3M化学比赛", "A01"))   # 其它学会照旧不计
 
 
+class Calibration2024(unittest.TestCase):
+    """2026-09-28 用 Result/2024（第三届资料）整体校准：读取格式 + 职位写法。"""
+
+    HDR = [["循人中学联课活动个人表现履历表"], ["姓名：某某", None, None, "班级：S3C2"], ["年份", "班级", "学会", "事项"]]
+
+    def blocks(self, rows):
+        return rules.parse_rows(rows)[1]
+
+    def test_two_digit_decimal_hours(self):
+        # 「26.5小时」以前被当成编号「26.」→ 只剩 5 小时（2024、2026 都有很多人受影响）
+        self.assertEqual(rules.strip_num("26.5小时"), "26.5小时")
+        self.assertEqual(rules.strip_num("26.16"), "26.16")
+        self.assertEqual(rules.strip_num("1.18小时"), "18小时")        # 单个数字 + 点 仍当编号
+        self.assertEqual(rules.strip_num("1.2026年新生营"), "2026年新生营")
+        b = self.blocks(self.HDR + [[2026, "S3C2", "电脑学会", "校内服务："], [None, None, None, "1.开放日（7小时）"],
+                                    [None, None, None, "总服务时数："], [None, None, None, "26.5小时"]])
+        self.assertEqual(b[0]["hours"], 26.5)
+
+    def test_year_row_in_middle(self):
+        # 李如意：前面几栏先写，年份行写在「校外服务」那一行 → 前面的条目属于那一年
+        rows = self.HDR + [
+            [None, None, None, "执委层/中层管理/联课处工委："], [None, None, None, "1. 担任学会执委——查账"],
+            [None, None, None, "校外服务："], [2024, "S3C2", "学长团", "-"],
+            [None, None, None, "校内服务："], [None, None, None, "1. 周会站岗服务 （14小时）"],
+            [None, None, None, "执委层/中层管理/联课处工委："], [None, None, None, "1. 担任学会执委——财政"],
+            [None, None, None, "校外服务："], [2023, "S2C2", "学长团", "-"],
+        ]
+        b = self.blocks(rows)
+        self.assertEqual([x["year"] for x in b], [2024, 2023])
+        self.assertEqual(b[0]["cats"]["role"], ["担任学会执委——查账"])
+        self.assertEqual(b[1]["cats"]["role"], ["担任学会执委——财政"])
+
+    def test_repeated_heading_same_year(self):
+        # 同一年「校外比赛」写两次（陈茁彦）→ 仍是同一格
+        rows = self.HDR + [[2024, "S1C3", "合唱团", "校外比赛及奖项：A 金奖"], [None, None, None, "校外活动：B"],
+                           [None, None, None, "校外比赛及奖项：C 银奖"], [2023, "J3F", "合唱团", "筹委：D"]]
+        b = self.blocks(rows)
+        self.assertEqual([x["year"] for x in b], [2024, 2023])
+        self.assertEqual(len(b[0]["cats"]["extComp"]), 2)
+
+    def test_class_change_without_year(self):
+        # 罗羽筒：第二、三年只写班级（S2S1、S1S1）没写年份 → 年份往前推
+        rows = self.HDR + [[2026, "S3S1", "电脑学会", "执委层/中层管理/联课处工委："], [None, None, None, "1.执委正主席"],
+                           [None, "S2S1", "电脑学会", "执委层/中层管理/联课处工委："], [None, None, None, "1.执委副主席"],
+                           [None, "S1S1", "电脑学会", "执委层/中层管理/联课处工委："], [None, None, None, "1.执委副秘书"]]
+        self.assertEqual([x["year"] for x in self.blocks(rows)], [2026, 2025, 2024])
+
+    def test_no_year_header_skips_name_line(self):
+        rows = [["循人中学联课活动个人表现履历表"], ["姓名：黄旨霖", None, None, "班级：S3C4 学号：19032"],
+                [2024, "S3C4", "C02 华乐团", "执委层/中层管理/联课处工委："], [None, None, None, "1.乐器领养人。"]]
+        meta, b = rules.parse_rows(rows)
+        self.assertEqual(meta.get("sid"), "19032")
+        self.assertEqual([x["year"] for x in b], [2024])
+
+    def test_table_layout(self):
+        # 谢咏恩：年份 | 活动 | 身份 | 性质 | 服务时数 | 备注
+        rows = [["履历表"], ["年份", "活动", "身份", "性质", "服务时数（小时）", "备注"],
+                [2024, "校园大扫除", "参与者", "校内服务", 4], [None, "音乐会", "演奏者", "团内活动的工作人员/表演"],
+                [None, "园游会", "工作人员", "团内活动的工作人员/表演, 校内服务", "14\n15"],
+                [None, "总服务时数：260小时"]]
+        b = self.blocks(rows)
+        self.assertEqual(b[0]["year"], 2024)
+        self.assertEqual(b[0]["hours"], 33)          # 4 + 14 + 15；最后的「总服务时数」是全部年份的，不用
+        self.assertEqual(len(b[0]["cats"]["team"]), 1)
+
+    def test_heading_without_ceng(self):
+        self.assertEqual(rules.match_header("执委/中层管理/联课处工委：-"), ("role", "-"))
+
+    def test_titles(self):
+        self.assertEqual(rules.classify_role("2023/2024财政", "摄影学会"), {"std": "财政(正)"})
+        self.assertEqual(rules.classify_role("2022/2023年度E02编辑小组——副主席", "E02编辑小组"), {"std": "主席(副)"})
+        self.assertEqual(rules.classify_role("副總務", "扯铃队"), {"std": "事务(副)"})
+        self.assertIsNone(rules.classify_role("無"))
+        self.assertEqual(rules.classify_role("财政小组"), {"std": "会员"})   # 只写「XX小组」= 组员 = 会员（上级 2026-09-28）
+
+    def test_teaching_is_mid(self):
+        for t in ("团内乐理课授课者", "音乐欣赏课授课"):
+            self.assertIn("mid", rules.classify_role(t), t)
+
+    def test_performance_leaders_to_comm(self):
+        R = member_rules.get()
+        for t in ("新春演出华乐团负责人。", "三民高中国际交流演出 - 带领人", "循中壬寅年新春汇演《舞扇迎新》 - 编排负责人"):
+            self.assertTrue(R.moves_to_comm(t), t)
+
+
+class SupervisorReply20260928(unittest.TestCase):
+    """上级 2026-09-28 对 2024 校准问题的回复。"""
+
+    def test_not_positions(self):
+        R = member_rules.get()
+        for t in ("地理科代表", "SEJARAH课代表"):
+            self.assertTrue(R.exclusion(t, "role"), t)
+        for t in ("壁报小组——组员", "摄影小组成员", "总务小组", "二线执委文宣小组", "壁报小组。"):   # 组员 = 会员
+            self.assertEqual(rules.classify_role(t), {"std": "会员"}, t)
+        self.assertIsNone(R.exclusion("家族家长（小组组长）", "role"))
+
+    def test_mid(self):
+        for t in ("JPC级别主教", "2023/24管乐团长笛组 - 总务", "管乐团小号组 - 财政", "打击乐组内副财政",
+                  "庆生活动负责人", "团圆饭负责人"):
+            self.assertEqual(list(rules.classify_role(t, "管乐团")), ["mid"], t)
+        self.assertEqual(rules.classify_role("学会执委——财政"), {"std": "财政(正)"})
+
+
+class HoursAccuracy20260928(unittest.TestCase):
+    """2026-09-28 服务时数准确性检查（2024 + 2026 两届）。"""
+    HDR = [["履历表"], ["年份", "班级", "学会", "事项", None, "备注"]]
+
+    def hours(self, rows):
+        return [b["hours"] for b in rules.parse_rows(self.HDR + rows)[1]]
+
+    def test_total_with_space(self):
+        # 「73 小时 10 分钟」以前把「73 」当编号 → 只剩 10 分钟（戴昇第）
+        self.assertEqual(self.hours([[2025, "S2", "X", "总服务时数："], [None, None, None, "73 小时 10 分钟"]]), [73.17])
+
+    def test_single_digit_decimal_total(self):
+        rows = [[2025, "S2", "X", "校内服务："], [None, None, None, "1.捐血（2.5小时）"], [None, None, None, "2.开放日（6小时）"],
+                [None, None, None, "总服务时数：8.5小时"]]
+        self.assertEqual(self.hours(rows), [8.5])                      # 以前读成 5
+        rows = [[2025, "S2", "X", "总服务时数："], [None, None, None, "1.20小时 55分钟"]]
+        self.assertEqual(self.hours(rows), [20.92])                    # 「1.」是编号
+
+    def test_total_in_remark_column(self):
+        # 右边备注栏写总数，下一行的服务条目不能被当成总数（陈永祥、何慧琳、王稀玟）
+        rows = [[2025, "S2", "X", "校外服务", "1. 银禧老妇院服务（10小时10分钟）", "总服务时数： 82小时10分钟"],
+                [None, None, None, None, "2. 黄河大合唱——表演者（49小时55分钟）"]]
+        b = rules.parse_rows(self.HDR + rows)[1][0]
+        self.assertEqual(b["hours"], 82.17)
+        self.assertEqual(len(b["cats"]["extSvc"]), 2)
+
+    def test_chinese_numerals_and_multiplier(self):
+        self.assertEqual(rules.parse_hours("周会服务（四小时）"), 4)
+        self.assertEqual(rules.parse_hours("总服务时数：五十二小时"), 52)
+        self.assertEqual(rules.parse_hours("一个半小时"), 1.5)
+        self.assertEqual(rules.parse_hours("运动会服务（12小时×2天）"), 24)
+        self.assertEqual(rules.parse_hours("（8小时*3天=24小时）"), 24)
+
+
+class ThreeYears20260928(unittest.TestCase):
+    """2026-09-28 用 Result/2024、2025、2026 三届资料校验。"""
+    HDR = [["履历表"], ["年份", "班级", "学会", "事项"]]
+
+    def test_year_row_one_line_late(self):
+        # 梁嘉谦：年份写在下一行，那一行的内容其实是上一年的总数 / 第 4 项
+        rows = self.HDR + [[2025, "S3", "图书馆服务团", "校内服务："], [None, None, None, "1. 轮值（44小时）"],
+                           [None, None, None, "总服务时数："], [2024, "S2", "图书馆服务团", "1. 44小时"],
+                           [None, None, None, "校内服务："], [None, None, None, "1. A（1小时）"], [None, None, None, "2. B（2小时）"],
+                           [2023, "S1", "图书馆服务团", "3. C（3小时）"], [None, None, None, "筹委："], [None, None, None, "1. D"]]
+        b = rules.parse_rows(rows)[1]
+        self.assertEqual([x["year"] for x in b], [2025, 2024, 2023])
+        self.assertEqual(b[0]["hours"], 44)
+        self.assertEqual(len(b[1]["cats"]["intSvc"]), 3)
+        self.assertEqual(b[2]["cats"], {"comm": ["D"]})
+
+    def test_headings(self):
+        self.assertEqual(rules.match_header("学会职务：执委正宣传部")[0], "role")
+        self.assertEqual(rules.match_header("活动职务")[0], "comm")
+        self.assertEqual(rules.match_header("校内比赛以及奖项：-")[0], "intComp")
+
+    def test_roles(self):
+        self.assertEqual(rules.classify_role("执委层（查账）"), {"std": "查账"})
+        self.assertEqual(rules.classify_role("线上干训营29/5-31/5 --团康关主"), {"mid": ["线上干训营-团康关主"]})
+        self.assertEqual(rules.classify_role("22/23联课处工委：正事务"), {"other": "联课处工委-事务(正)"})
+        R = member_rules.get()
+        for t in ("《燃》文娱汇演团体 - 工作人员", "马来西亚禾乐艺术节（舞蹈大赛）—带领人", "5月份线上干训营 - 课程讲解员"):
+            self.assertTrue(R.moves_to_comm(t), t)
+
+    def test_awards(self):
+        A = award_rules.get()
+        for t in ("4th Asia Open Dance Championship - Outstanding Dancer", "Meadow Ballet Championship 2021 - First Place",
+                  "3rd Asia Open Dance Championship Troupe (Open) - 1st + Best Duo", "戏聚奖之线上海报人气奖"):
+            self.assertTrue(A.why(t), t)
+        self.assertFalse(A.why("4th MFA Malaysia TaeKwon-Do Invitational Championship 2024"))
+        self.assertIsNone(A.comp_judge("青少年组传统对练——第一名", "C06"))
+
+
+class SupervisorReply20260928b(unittest.TestCase):
+    """上级 2026-09-28 对三届校验问题的回复。"""
+
+    def test_group_members(self):
+        R = member_rules.get()
+        self.assertIsNone(R.exclusion("礼仪小组组员", "role"))
+        self.assertEqual(rules.classify_role("担任礼仪小组组员"), {"std": "会员"})     # 上级：礼仪小组组员算会员
+        self.assertIn("mid", rules.classify_role("礼仪小组组长"))
+        self.assertIsNone(R.exclusion("总务小组组长", "role"))
+        self.assertIn("mid", rules.classify_role("总务小组组长"))
+        self.assertTrue(R.team_to_role_match("担任礼仪小组成员"))
+
+
+class ServiceCount20260928(unittest.TestCase):
+    """资料总览「服务（数量）」：例常（周会等）不算、同一年同一项只算 1 个（维护者 2026-09-28）"""
+
+    def test_count(self):
+        svc = ["%d/6 搬椅子服务（1小时）" % d for d in range(1, 6)] + ["校园开放日服务", "周会站岗服务", "例常早操服务（2小时）"]
+        blk = lambda y: {"year": y, "clubCode": "A01", "clubName": "学长团", "exBlock": None, "hours": 6,
+                         "cats": {"intSvc": list(svc), "extSvc": ["捐血运动"]}}
+        s = {"sid": "1", "blocks": [blk(2025), blk(2026)]}
+        rules.compute_exclusions(s)
+        for y in (2025, 2026):          # 不同年份各自算
+            st, _ = rules.compute_stats(s, {}, y)
+            self.assertEqual(st["svcN"], 3)          # 搬椅子 1 + 开放日 1 + 捐血 1
+            self.assertEqual(st["work"], 9)          # 工作 = 服务栏每一条都算（不受影响）
+            self.assertEqual(st["intSvc"], 8)
+
+    def test_sheet_field(self):
+        from achievement import input_sheet
+        self.assertIn("svc", [f["k"] for f in input_sheet.FIELDS])
+
+
 class WholeFolder(unittest.TestCase):
     """有 Result/ 文件夹时，确认整个文件夹都读得进来、算得出来。"""
 
@@ -304,7 +504,7 @@ class Structure(unittest.TestCase):
             self.assertTrue(dirs.overrides.is_file())
             # 资料总览（评审表格式）
             d = c.get("/api/input").get_json()
-            self.assertEqual(len(d["config"]["fields"]), 5)
+            self.assertEqual(len(d["config"]["fields"]), 6)   # 执委、中层管理、筹委、服务(小时)、服务(数量)、活动/工作/比赛
             self.assertTrue(d["config"]["years"])
             self.assertEqual(c.get("/export/input.xlsx").status_code, 200)
 

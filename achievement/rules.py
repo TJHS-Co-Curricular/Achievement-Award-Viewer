@@ -15,30 +15,40 @@ from collections import Counter, defaultdict
 
 # ---------------------------------------------------------------- 类别
 CATS = [
-    ("role", "执委/职务", r"^(执委层/?中层管理/?联课处工委(/?会员)?|执委层/?中层管理|执委层|职务|中层管理|执委)"),
-    ("comm", "筹委", r"^(筹委)"),
-    ("extComp", "校外比赛", r"^(参与校外比赛(及|与)奖项|参与校外比赛|校外比赛(及|与)奖项|校外比赛|曾参与社团比赛)"),
-    ("intComp", "校内比赛", r"^(参与校内比赛(及|与)奖项|参与校内比赛|校内比赛(及|与)奖项|校内比赛|校内奖项)"),
-    ("extAct", "校外活动", r"^(参与校外活动|观看校外活动|校外活动)"),
+    ("role", "执委/职务", r"^(执委层?/?中层管理/?联课处工委(/?会员)?|执委层?/?中层管理|执委层|学会职务|职务|中层管理|执委)"),
+    ("comm", "筹委", r"^(筹委|担任活动筹委|活动筹委|活动职务)"),
+    ("extComp", "校外比赛", r"^(参[与加]校外比赛(及|与|以及)奖项|参[与加]校外比赛|校外比赛(及|与|以及)奖项|校外比赛|曾参与社团比赛)"),
+    ("intComp", "校内比赛", r"^(参[与加]校内比赛(及|与|以及)奖项|参[与加]校内比赛|校内比赛(及|与|/|以及)(奖项|荣誉)|校内比赛|校内奖项)"),
+    ("extAct", "校外活动", r"^(参[与加]校外活动|观看校外活动|校外活动|参与校外/内活动)"),
     ("intAct", "校内活动", r"^(参与校内活动|校内活动)"),
     ("extSvc", "校外服务", r"^(校外服务)"),
-    ("intSvc", "校内服务", r"^(校内服务)"),
+    ("intSvc", "校内服务", r"^(校内服务|校内外服务)"),
     ("total", "总服务时数", r"^(总服务时数|服务总时数|服务时数)"),
-    ("team", "团内工作/表演", r"^(团内活动的?工作人员(/表演)?|团内工作人员)"),
-    ("badge", "考章", r"^(考章)"),
-    ("honor", "团内荣誉", r"^(团内荣誉|团内荣耀)"),
+    ("team", "团内工作/表演", r"^(团内活动的?工作人员(/表演)?|团内工作人员|团内活动|参与团内营会/活动|团内表演|校内演出|校内表演)"),
+    ("badge", "考章", r"^(考章|专章)"),
+    ("honor", "团内荣誉", r"^(团内荣誉|团内荣耀|学会奖项|荣誉|学术成就|体育奖项)"),
 ]
 CATS_RE = [(k, lab, re.compile(rx)) for k, lab, rx in CATS]
 CAT_LABEL = {k: lab for k, lab, _ in CATS}
 CAT_LABEL["other"] = "其他（未注明类别）"
 
 # 获奖的判断规则在 config/award.json
-EMPTY_RE = re.compile(r"^[\s\-—－–_/无nN/A.。、:：]*$")
+EMPTY_RE = re.compile(r"^[\s\-—－–_/无無nN/A.。、:：]*$")
 _WS = re.compile(r"[\s 　​-‏⁠-⁯﻿]+")
 
 
 def norm(s) -> str:
     return _WS.sub("", str(s))
+
+
+# 职位常见的繁体字 → 简体（只用在认职位，不改学生写的原文；2024 校准：「副總務」）
+_T2S = str.maketrans(
+    "總務財賬帳書長員組會團課網頁衛紀導顧問監動無隊記錄攝體樂藝術設計傳聯絡處選學習練領幹級屆輔協調劃觀師歡節發備報為議規幫隊員種啟",
+    "总务财账帐书长员组会团课网页卫纪导顾问监动无队记录摄体乐艺术设计传联络处选学习练领干级届辅协调划观师欢节发备报为议规帮队员种启")
+
+
+def to_simplified(s) -> str:
+    return str(s).translate(_T2S)
 
 
 def match_header(text):
@@ -56,8 +66,15 @@ def match_header(text):
     return None
 
 
+_HOURS_ONLY = re.compile(r"\s*\d{2,}[.．]\d+\s*(小时|[Hh](ours?|rs?)?)?[。.]?\s*")
+
+
 def strip_num(s) -> str:
-    return re.sub(r"^\s*(\d{1,2}\s*[.．、)）]|\d{1,2}\s+(?=\D)|[•·●▪\-–—]\s*(?=\S))\s*", "", str(s), count=1).strip()
+    # 「26.5小时」这种两位数以上的小数是时数，不是编号「26.」（2026 校准：罗羽筒 26.5 被读成 5）；
+    # 「1.18小时」「1.2026年……」仍当作编号 1. 处理（和以前一样）
+    if _HOURS_ONLY.fullmatch(str(s)):
+        return str(s).strip()
+    return re.sub(r"^\s*(\d{1,2}\s*[.．、)）]|\d{1,2}\s+(?!小时|分|个|[HhMm])(?=\D)|[•·●▪\-–—]\s*(?=\S))\s*", "", str(s), count=1).strip()
 
 
 _HOURS_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(?:个)?\s*((?i:小时|hours?|hrs?|h\b))(?:\s*(\d+(?:\.\d+)?)\s*分钟?)?|(\d+(?:\.\d+)?)\s*(?:分钟|(?i:mins?\b)|M\b)")
@@ -65,7 +82,42 @@ _HOURS_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(?:个)?\s*((?i:小时|hours?|hrs?|h\
 _HOURS_DENOM = re.compile(r"/\s*\d+(?:\.\d+)?\s*(?:小时|分钟|mins?\b|M\b|hours?|hrs?|h\b)", re.I)
 
 
+_CN_NUM = {"零": 0, "一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9}
+_CN_HOURS = re.compile(r"([零一二两三四五六七八九十]{1,4})(个半|个|)(小时|分钟)")
+
+
+def _cn_to_int(w):
+    if "十" in w:
+        a, _, b = w.partition("十")
+        return (_CN_NUM.get(a, 1) if a else 1) * 10 + (_CN_NUM.get(b, 0) if b else 0)
+    n = 0
+    for ch in w:
+        n = n * 10 + _CN_NUM[ch]
+    return n
+
+
+def _cn_hours(s):
+    """「四小时」「一个半小时」「三十分钟」→ 阿拉伯数字（2024 校准：汪威俊）"""
+    def f(m):
+        n = _cn_to_int(m.group(1)) + (0.5 if m.group(2) == "个半" else 0)
+        return f"{n:g}{m.group(3)}"
+    return _CN_HOURS.sub(f, s)
+
+
+_MULT_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(小时|[Hh](?:ours?|rs?)?)\s*[×xX*]\s*(\d+)\s*(?:天|次|日|场|晚)?(\s*[=＝]\s*(?=\d))?")
+
+
+def _mult_hours(s):
+    """「12小时×2天」→ 24小时；「8小时*3天=24小时」→ 只取等号后面的 24小时（2024 校准：舞蹈团）"""
+    def f(m):
+        if m.group(4):
+            return ""
+        return f"{float(m.group(1)) * int(m.group(3)):g}小时"
+    return _MULT_RE.sub(f, s)
+
+
 def parse_hours(s):
+    s = _mult_hours(_cn_hours(str(s)))
     vals = []
     for m in _HOURS_RE.finditer(_HOURS_DENOM.sub("", str(s))):
         if m.group(1):
@@ -131,7 +183,7 @@ def parse_rows(rows, is_pdf=False):
             meta["sid"] = m.group(1)
 
     blocks = []
-    st = {"blk": None, "cat": None, "last": None, "lastYear": None, "lastCls": None}
+    st = {"blk": None, "cat": None, "last": None, "lastYear": None, "lastCls": None, "rowYear": False}
 
     def new_block(year, cls, club):
         st["blk"] = {"year": year, "cls": cls, "club": club, "cats": {}, "declaredTotal": None}
@@ -145,26 +197,37 @@ def parse_rows(rows, is_pdf=False):
             return
         if st["blk"] is None:
             new_block(st["lastYear"], st["lastCls"], "")
-        if t == "0":
+        if t == "0" or re.fullmatch(r"[（(]?(未入学|未入校|尚未入学)[）)]?", t):
+            return
+        if re.fullmatch(r"[^\d：:，,。]{1,8}[：:]", t):   # 不认识的小标题（例：「相关活动：」）只是标题，不是一项
+            st["last"] = None
             return
         k = st["cat"] or "other"
         if k == "other":
-            if re.search(r"执委|干部|主席|财政|秘书", t) and "筹委" not in t:
+            if re.search(r"执委|干部|主席|财政|秘书|总务|查账|^(会员|团员|队员)$", t) and "筹委" not in t:
                 k = "role"
             elif re.search(r"筹委|筹主", t):
                 k = "comm"
         blk = st["blk"]
         if k == "total":
-            h = parse_hours(t)
-            if h is None and re.fullmatch(r"\d+(\.\d+)?", norm(t)):
-                h = float(norm(t))
+            h = _total_value(t)
+            # 「8.5小时」「6.0小时」：strip_num 会把「8.」当成编号 → 两种读法都留着，最后按逐项相加选比较接近的
+            raw = _total_value(str(text).strip())
+            alt = raw if raw is not None and h is not None and abs(raw - h) > 1e-9 else None
+            if re.search(r"\d[.．]\d+\s*小时\s*\d+\s*分", str(text)):   # 「1.20小时 55分钟」= 编号 1. + 20小时55分钟
+                alt = None
+            if alt is not None and not re.match(r"^\s*1\s*[.．]", str(text)):
+                h, alt = alt, h          # 预设：开头不是「1.」的当小数（1.18小时 仍当编号 1.）
             if h is not None:
                 blk.setdefault("totalParts", []).append(h)
+                blk.setdefault("totalAlts", []).append(alt)
                 blk["declaredTotal"] = _declared_total(blk["totalParts"])
             st["last"] = None
             return
         blk["cats"].setdefault(k, []).append(t)
         st["last"] = (k, len(blk["cats"][k]) - 1)
+        m = re.match(r"^\s*(\d{1,2})\s*[.．、)）]", str(text))
+        st["lastNum"] = (id(blk), k, int(m.group(1))) if m else None
 
     def split_lines(s):
         return [x.strip() for x in re.split(r"\r?\n|\r", str(s)) if x.strip()]
@@ -172,6 +235,12 @@ def parse_rows(rows, is_pdf=False):
     def handle_text(text):
         h = match_header(text)
         if h:
+            blk = st["blk"]
+            if blk is not None and not st["rowYear"] and h[0] == "role" and blk["cats"].get("role") and st["cat"] != "role":
+                # 同一格局里栏目又从头出现、这一行却没写年份：可能是下一年的年份写在后面（李如意）。
+                # 先开一个「暂定」格；等到年份行出现就归那一年，一直没有年份就并回上一格。
+                new_block(None, blk["cls"], blk["club"])
+                st["blk"]["provisional"] = True
             st["cat"], st["last"] = h[0], None
             if h[1]:
                 for l in split_lines(h[1]):
@@ -189,31 +258,80 @@ def parse_rows(rows, is_pdf=False):
             return
         add_item(line)
 
+    if hi >= 0 and _is_table_layout(rows[hi]):
+        return meta, _finish_blocks(_parse_table_layout(rows, hi, yi, handle_line, new_block, st, blocks))
+
     for r in range(hi + 1, len(rows)):
         row = rows[r] or []
         get = lambda i: row[i] if i < len(row) else None
+        if hi < 0 and _is_meta_row(row):   # 没有「年份」表头时，标题行 / 姓名班级行不是资料
+            continue
         y = year_of(get(yi))
         club = _s(get(ki)).strip() if get(ki) is not None and _s(get(ki)).strip() else None
         cls = _s(get(ci)).strip() if get(ci) is not None and _s(get(ci)).strip() else None
         blk = st["blk"]
-        if y:
+        st["rowYear"] = bool(y)
+        first = next((_s(v) for v in row[di:] if v is not None and _s(v).strip()), "")
+        starts_cycle = bool(match_header(re.sub(r"[\r\n]+", "", first))) and match_header(re.sub(r"[\r\n]+", "", first))[0] == "role"
+        if (not y and cls and blk is not None and blk.get("cls") and re.fullmatch(r"[JSjs]\d.*", cls)
+                and norm(cls) != norm(blk["cls"]) and st["lastYear"] and blocks and blocks[-1]["year"]):
+            # 没写年份、但班级换了（例：S3S1 → S2S1）：是上一年，年份按顺序往前推（2026 校准：罗羽筒）
+            y = st["lastYear"] - 1
+            st["rowYear"] = True
+        if y and blk is not None and blk["year"] is None and not starts_cycle and (blk.get("provisional") or not any(b["year"] for b in blocks)):
+            # 年份那一行写在中间（例：前面几栏先写，年份和班级、学会写在「校外服务」那一行）：
+            # 前面没有年份的条目就属于这一年（2024 校准：李如意）
+            st["lastYear"] = y
+            st["lastCls"] = cls or st["lastCls"]
+            blk.update(year=y, cls=cls, club=club or blk["club"])
+            blk.pop("provisional", None)
+        elif y:
+            # 年份写在下一行（梁嘉谦）：年份那一行的内容其实是上一年的延续——
+            # 例如上一年「总服务时数：」下面的数字，或上一年编号 1、2、3 之后的第 4 项 → 先放回上一年
+            if blk is not None and st["cat"] and first and not match_header(re.sub(r"[\r\n]+", "", first)):
+                m = re.match(r"^\s*(\d{1,2})\s*[.．、)）]", first)
+                ln = st.get("lastNum")
+                cont = (st["cat"] == "total" and blk.get("declaredTotal") is None and _total_value(strip_num(first)) is not None) or \
+                       (m and ln and ln[0] == id(blk) and ln[1] == st["cat"] and int(m.group(1)) == ln[2] + 1)
+                if cont:
+                    for c2 in range(di, len(row)):
+                        if row[c2] is not None and _s(row[c2]).strip():
+                            for l in split_lines(_s(row[c2])):
+                                handle_line(l)
+                            break
+                    row = list(row)
+                    for c2 in range(di, len(row)):
+                        if row[c2] is not None and _s(row[c2]).strip():
+                            row[c2] = None
+                            break
             st["lastYear"] = y
             st["lastCls"] = cls or st["lastCls"]
             new_block(y, cls, club or (blk["club"] if blk else ""))
         elif club and blk and club != blk["club"] and not re.fullmatch(r"学会|班级|年份", club):
             new_block(st["lastYear"], cls or st["lastCls"], club)
         row_item = None
+        first_c = None
         for c in range(di, len(row)):
             v = row[c]
             if v is None or _s(v).strip() == "":
                 continue
+            if first_c is None:
+                first_c = c
             s = _s(v)
             flat = re.sub(r"[\r\n]+", "", s)
             whole = match_header(flat)
+            lines = split_lines(s)
+            if c > first_c and ((whole and whole[0] == "total") or (lines and (match_header(lines[0]) or ("",))[0] == "total")):
+                # 右边备注栏写的「总服务时数：82小时」：记下总数，但不要改变这一栏接下来的类别
+                # （否则下一行的服务条目会被当成总数；2026：陈永祥、苏爱欣……）
+                keep = st["cat"]
+                for l in (lines if len(lines) > 1 else [flat]):
+                    handle_line(l)
+                st["cat"], st["last"] = keep, None
+                continue
             if whole and (not whole[1] or not re.search(r"[\r\n]", s)):
                 handle_text(flat)
                 continue
-            lines = split_lines(s)
             if len(lines) > 1 or match_header(lines[0]):
                 for l in lines:
                     handle_line(l)
@@ -233,6 +351,52 @@ def parse_rows(rows, is_pdf=False):
             if st["last"]:
                 row_item = st["last"]
 
+    return meta, _finish_blocks(blocks)
+
+
+def _total_value(t):
+    h = parse_hours(t)
+    if h is None and re.fullmatch(r"\d+(\.\d+)?", norm(t)):
+        h = float(norm(t))
+    return h
+
+
+def _pick_total(b, itemized):
+    """总服务时数有两种读法（例「8.5小时」= 8.5 还是编号 8. + 5 小时）时，选和逐项相加最接近的那一种。"""
+    parts, alts = b.get("totalParts") or [], b.get("totalAlts") or []
+    idx = [i for i, a in enumerate(alts) if a is not None][:6]
+    if not idx or itemized is None:
+        return
+    from itertools import product
+    best = (abs(_declared_total(parts) - itemized), parts)
+    for combo in product([0, 1], repeat=len(idx)):
+        if not any(combo):
+            continue
+        cand = list(parts)
+        for i, use in zip(idx, combo):
+            if use:
+                cand[i] = alts[i]
+        d = abs(_declared_total(cand) - itemized)
+        if d < best[0] - 1e-9 and d <= 0.5:   # 另一种读法要和逐项相加几乎一样才换
+            best = (d, cand)
+    b["totalParts"] = best[1]
+    b["declaredTotal"] = _declared_total(best[1])
+
+
+def _finish_blocks(blocks):
+    merged = []
+    for b in blocks:    # 暂定格一直没等到年份：并回上一格（只是同一格里栏目重复写）
+        if b.pop("provisional", None) and b["year"] is None and merged:
+            prev = merged[-1]
+            for k, v in b["cats"].items():
+                prev["cats"].setdefault(k, []).extend(v)
+            if b.get("totalParts"):
+                prev.setdefault("totalParts", []).extend(b["totalParts"])
+                prev.setdefault("totalAlts", []).extend(b.get("totalAlts") or [None] * len(b["totalParts"]))
+                prev["declaredTotal"] = _declared_total(prev["totalParts"])
+            continue
+        merged.append(b)
+    blocks = merged
     out = []
     for b in blocks:
         for k in list(b["cats"]):
@@ -247,13 +411,70 @@ def parse_rows(rows, is_pdf=False):
                     itemized += h
                     anyh = True
         b["itemizedHours"] = round(itemized, 2) if anyh else None
+        _pick_total(b, b["itemizedHours"])
         # 服务时数：优先用学生自填的「总服务时数」；该年没填才用逐项相加（上级 2026-09-24 定，对没逐项写时数的学生较公平）
         b["hours"] = round(b["declaredTotal"], 2) if b["declaredTotal"] is not None else b["itemizedHours"]
         b.pop("totalParts", None)
+        b.pop("totalAlts", None)
         b["club"] = re.sub(r"\s+", " ", _s(b["club"] or "")).strip()
         if b["cats"] or b["hours"]:
             out.append(b)
-    return meta, out
+    return out
+
+
+def _is_meta_row(row) -> bool:
+    txt = norm(" ".join(_s(v) for v in row if v is not None))
+    return bool(re.search(r"姓名[：:]|学号[：:]|个人表现履历表$", txt))
+
+
+def _is_table_layout(header_row) -> bool:
+    """另一种履历表格式：年份 | 活动 | 身份 | 性质 | 服务时数 | 备注（每行一项，「性质」写栏目）"""
+    vals = [norm(_s(v)) for v in (header_row or []) if v is not None]
+    return "性质" in vals and "活动" in vals
+
+
+def _parse_table_layout(rows, hi, yi, handle_line, new_block, st, blocks):
+    """表格式履历表（2024 校准：谢咏恩）：把每一行转成「栏目：活动-身份（N小时）」再用一般流程处理。
+    「性质」写了两个栏目时：有时数就放服务栏，没有就放第一个。"""
+    hdr = {norm(_s(v)): j for j, v in enumerate(rows[hi] or []) if v is not None}
+    ai, ri, ti = hdr.get("活动"), hdr.get("身份"), hdr.get("性质")
+    hri = next((j for k, j in hdr.items() if "时数" in k), None)
+    bi = hdr.get("备注")
+    for r in range(hi + 1, len(rows)):
+        row = rows[r] or []
+        get = lambda i: (_s(row[i]).strip() if i is not None and i < len(row) and row[i] is not None else "")
+        y = year_of(row[yi] if yi < len(row) else None)
+        if y:
+            st["lastYear"] = y
+            new_block(y, None, "")
+        act = get(ai)
+        if not act:
+            continue
+        if match_header(act):          # 例：「总服务时数：260小时」写在最后 = 全部年份的总数，不是某一年的，不用
+            continue
+        if st["blk"] is None:
+            new_block(st["lastYear"], None, "")
+        # 「团内活动的工作人员/表演」本身含斜线：整格先试一次
+        whole = match_header(get(ti))
+        if whole:
+            cats = [whole]
+        else:
+            parts = [x.strip() for x in re.split(r"[,，]", get(ti)) if x.strip()]
+            cats = [c for c in (match_header(x) for x in parts) if c]
+        nums = [float(x) for x in re.findall(r"\d+(?:\.\d+)?", get(hri))]
+        keys = [c[0] for c in cats]
+        if nums:
+            k = next((k for k in keys if k in ("intSvc", "extSvc")), keys[0] if keys else "other")
+        else:
+            k = keys[0] if keys else "other"
+        text = act + (f"-{get(ri)}" if get(ri) else "")
+        if get(bi):
+            text += f"（{get(bi).replace(chr(10), ' ').strip()}）"
+        if nums and k in ("intSvc", "extSvc"):
+            text += f"（{sum(nums):g}小时）"
+        st["cat"], st["last"] = k, None
+        st["blk"]["cats"].setdefault(k, []).append(text)
+    return blocks
 
 
 def parse_filename(fn: str) -> dict:
@@ -391,11 +612,19 @@ def classify_role(raw, club_name=""):
     """执委栏的一条 → {'std': 标准写法} / {'other': 其它职位名} / {'mid': [中层管理职位…]}（可同时有）或 None。
     按 member_rules.json「四、职位归类」从上往下找第一条符合的规则。"""
     R = MR.get()
-    t = norm(raw)
+    t = to_simplified(norm(raw))
     t = re.sub(r"^\d{1,2}[，,、.．]", "", t)
     t = re.sub(r"[。；;，,.]+$", "", t)
     if not t or EMPTY_RE.match(t) or re.fullmatch(r"[（(]?无[）)]?", t):
         return None
+    # 「执委层（查账）」：整条写在括号里 → 拿掉外壳；「29/5-31/5」这类日期不是职位的一部分（2024 / 2025 校准）
+    t = re.sub(r"^(执委层?|中层管理|执委)[（(](.+)[）)]$", r"\2", t)
+    t = re.sub(r"(?<!\d)\d{1,2}/(?:0?[1-9]|1[0-2])(?:\s*[-–~至]\s*\d{1,2}/(?:0?[1-9]|1[0-2]))?(?!\d)", "", t)
+    # 年度写在最前面（「2023/2024财政」）、学会名称本身含「小组」（「E02编辑小组——副主席」）：
+    # 先拿掉再认标准职称（2024 校准）
+    t = re.sub(r"^(\d{2,4}\s*[/／]\s*\d{2,4}|20\d\d)(年度|年|届)?", "", t) or t
+    club_n = re.sub(r"^[A-E]\d{2}", "", norm(club_name or ""))
+    t_title = t.replace(club_n, "") if len(club_n) >= 2 else t
     rule = R.role_rule(t, club_name)
     kind = rule.get("归类") if rule else None
     if kind == "执委":
@@ -410,10 +639,10 @@ def classify_role(raw, club_name=""):
         return r
     if kind == "会员":
         return {"std": "会员"}
-    if not any(w in t.lower() for w in R.not_title):
+    if not any(w in t_title.lower() for w in R.not_title):
         for name in R.titles_side + R.titles_plain:
             rx, side_rx = _title_rx(name, R)
-            if rx.search(t):
+            if rx.search(t_title) or rx.search(re.sub(r"^[A-E]\d{2}", "", t_title).lstrip("-—–－:：")):
                 std = name if name in R.titles_plain else f"{name}({_side(t, side_rx) or _no_side(t)})"
                 return _with_context(std, side_rx, t, club_name)
     c = clean_role(t, club_name)
@@ -477,7 +706,7 @@ def comp_judge(text, code):
 
 
 def _work_key(t):
-    """判断「同一条工作写了两次」用：去掉时数、日期、括号内容"""
+    """判断「同一项服务写了两次」用：去掉时数、日期、括号内容"""
     t = re.sub(r"[（(][^）)]*[）)]", "", str(t))
     t = re.sub(r"\d+(\.\d+)?\s*(小时|个小时|分钟|h|H|hrs?)", "", t)
     t = re.sub(r"\d{1,4}\s*[/.-]\s*\d{1,2}(\s*[/.-]\s*\d{2,4})?", "", t)
@@ -486,31 +715,51 @@ def _work_key(t):
     return re.sub(r"(服务|工作)$", "", t)
 
 
-def _mark_work(b, seen):
-    """资料总览的「工作」：b["wk"][栏][i] = 1 算工作、2 = 是工作但同一年已算过、0 = 不是工作；
-    b["wr"][栏][i] = 说明（例常 / 活动改算工作 / 重复）。
-    规则在 config/work.json。"""
+def _mark_svc(b, seen):
+    """资料总览「服务（数量）」（维护者 2026-09-28 定）：b["sc"][栏][i] = 1 算、0 例常不算、2 同一年已算过；
+    说明放在 b["wr"]（个人页「详细」显示）。规则在 config/work.json「服务（数量）」。"""
     from . import work_rules
     W = work_rules.get()
-    b["wk"], b["wr"] = {}, {}
-    for k in ("team", "intSvc", "extSvc", "intAct", "extAct"):
+    b["sc"] = {}
+    for k in ("intSvc", "extSvc"):
         arr = b["cats"].get(k) or []
         if not arr:
             continue
-        wk, wr = [], []
+        sc, wr = [], []
+        exl = b["ex"].get(k) or [None] * len(arr)
         for i, t in enumerate(arr):
-            ok, why = W.judge(t, k)
-            if ok and not b["ex"].get(k, [None] * len(arr))[i] and not b["exBlock"]:
-                # 同一年同一项工作写了好几次（例：不同日期的搬椅子服务、服务栏和团内工作栏都写了）→ 只算 1 个
-                grp = W.group(t)
+            why = W.svc_routine_why(t)
+            if why:
+                sc.append(0)
+                wr.append(why)
+                continue
+            v = 1
+            if not exl[i] and not b["exBlock"]:
+                grp = W.svc_group(t)
                 key = f"{b['year']}|{'类:' + grp if grp else _work_key(t)}"
                 if len(key) > 6:
                     if key in seen:
-                        ok, why = 2, (f"同一年「{grp}」已算过，只算 1 个工作" if grp else "同一年同一项工作已算过，只算 1 个")
+                        v, why = 2, (f"同一年「{grp}」已算过，服务数量只算 1 个" if grp else "同一年同一项服务已算过，服务数量只算 1 个")
                     seen[key] = k
-            wk.append(2 if ok == 2 else 1 if ok else 0)   # 1 = 算工作；2 = 是工作但同一年已算过（也不算活动）
+            sc.append(v)
             wr.append(why)
-        b["wk"][k], b["wr"][k] = wk, wr
+        b["sc"][k] = sc
+        b["wr"][k] = wr
+
+
+def _mark_work(b, seen=None):
+    """资料总览的「活动 / 工作」（维护者 2026-09-28 定，取代之前所有条件）：
+    服务栏的条目 = 工作；除了比赛和服务，其它栏目（活动、团内工作/表演、考章、团内荣誉）一律 = 活动。
+    b["wk"][栏][i] = 1 工作 / 3 活动。不计的条目（班级、B 类……）在 compute_stats 里本来就不算。
+    算哪几栏在 config/work.json。"""
+    from . import work_rules
+    W = work_rules.get()
+    b["wk"], b["wr"] = {}, {}
+    for k, arr in b["cats"].items():
+        v = W.kind(k)
+        if v and arr:
+            b["wk"][k] = [v] * len(arr)
+            b["wr"][k] = [None] * len(arr)
 
 
 def _simp(t):
@@ -586,12 +835,21 @@ def move_event_roles(s):
         if "comm" in b["cats"]:
             b["cats"]["comm"] = _split_mixed_comm(b["cats"]["comm"], R, "comm")
         roles, comms = b["cats"].get("role", []), b["cats"].get("comm", [])
+        team = b["cats"].get("team", [])
         to_comm = [t for t in roles if R.moves_to_comm(t)]
         to_role = [t for t in comms if R.moves_to_role(t)]
-        if not to_comm and not to_role:
+        team_role = [t for t in team if R.team_to_role_match(t)]   # 例：礼仪小组组员（上级 2026-09-28）
+        if not to_comm and not to_role and not team_role:
             continue
-        new_role = [t for t in roles if t not in to_comm] + to_role
+        new_role = [t for t in roles if t not in to_comm] + to_role + team_role
         new_comm = [t for t in comms if t not in to_role] + to_comm
+        if team_role:
+            new_team = [t for t in team if t not in team_role]
+            if new_team:
+                b["cats"]["team"] = new_team
+            else:
+                b["cats"].pop("team", None)
+            b["movedTeam"] = team_role
         for k, arr in (("role", new_role), ("comm", new_comm)):
             if arr:
                 b["cats"][k] = arr
@@ -613,7 +871,8 @@ def compute_exclusions(s):
                 for i, t in enumerate(arr):
                     if b["ex"][k][i]:
                         continue
-                    j = comp_judge(t, b.get("clubCode", ""))
+                    js = [comp_judge(t, c) for c in (b.get("clubCodes") or [b.get("clubCode", "")])] or [comp_judge(t, "")]
+                    j = None if None in js else ("unsure" if "unsure" in js else js[0])
                     if j == "unsure":
                         b["unsure"][f"{k}#{i}"] = 1
                     elif j:
@@ -645,11 +904,12 @@ def compute_exclusions(s):
                                         else f"双学会重复，只计入 {keep[0].get('clubCode', '')}{keep[0].get('clubName', '')}")
                 seen[key] = keep
     # 预先计算每条的属性，供网页即时重算用
-    work_seen = {}
+    svc_seen = {}
     for b in s["blocks"]:
         b["aw"] = {k: [is_award(t) for t in b["cats"].get(k, [])] for k in ("extComp", "intComp") if k in b["cats"]}
         b["hr"] = {k: [parse_hours(t) for t in b["cats"].get(k, [])] for k in ("extSvc", "intSvc") if k in b["cats"]}
-        _mark_work(b, work_seen)
+        _mark_work(b)
+        _mark_svc(b, svc_seen)
         b["rc"] = [classify_role(t, b.get("clubName") or b.get("club")) for t in b["cats"].get("role", [])]
         b["nk"] = {k: [norm(t) for t in arr] for k, arr in b["cats"].items()}
         mc, mr = set(b.get("movedComm") or []), set(b.get("movedRole") or [])
@@ -658,8 +918,9 @@ def compute_exclusions(s):
         b["sp"] = {k: v for k, v in sp.items() if any(v)}
         if mc:
             b["mv"]["comm"] = [t in mc for t in b["cats"].get("comm", [])]
-        if mr:
-            b["mv"]["role"] = [t in mr for t in b["cats"].get("role", [])]
+        mt = set(b.get("movedTeam") or [])
+        if mr or mt:
+            b["mv"]["role"] = ["team" if t in mt else (t in mr) for t in b["cats"].get("role", [])]
 
 
 def item_key(s, b, k, t):
@@ -695,10 +956,13 @@ def compute_stats(s, ov=None, year=None):
                     c["unsure"] += 1
                 if x["inc"]:
                     c[k] += 1
+                    sc = (b.get("sc") or {}).get(k)
+                    if sc and sc[i] == 1:
+                        c["svcN"] += 1
                     wk = (b.get("wk") or {}).get(k)
                     if wk and wk[i] == 1:
                         c["work"] += 1
-                    elif k in ("extAct", "intAct") and not (wk and wk[i]):
+                    elif wk and wk[i] == 3:
                         c["acts"] += 1
                     if k in ("extComp", "intComp") and b["aw"][k][i]:
                         c["extAwards" if k == "extComp" else "intAwards"] += 1
@@ -715,7 +979,7 @@ def compute_stats(s, ov=None, year=None):
                 if not item_state(s, b, k, i, ov)["inc"] and b["hr"][k][i]:
                     h -= b["hr"][k][i]
         hours += max(0.0, h)
-    out = {k: c[k] for k in ("roles", "mid", "comm", "extComp", "intComp", "extAct", "intAct", "extSvc", "intSvc", "team", "badge", "honor", "unsure", "extAwards", "intAwards", "work", "acts")}
+    out = {k: c[k] for k in ("roles", "mid", "comm", "extComp", "intComp", "extAct", "intAct", "extSvc", "intSvc", "team", "badge", "honor", "unsure", "extAwards", "intAwards", "work", "acts", "svcN")}
     out["awards"] = out["extAwards"] + out["intAwards"]
     out["hours"] = round(hours, 2)
     return out, roles_by_block
@@ -793,6 +1057,21 @@ def finalize(students):
                 c = s["code"]
             b["clubCode"] = c or ""
             b["clubName"] = n or b["club"] or (top(code_name.get(c, Counter())) if c else "") or ""
+            # 一格写了两个学会（「合唱团/学长团」）：比赛是否代表本学会时两个都算（2024-2026 校验）
+            codes = [b["clubCode"]] if b["clubCode"] else []
+            for part in re.split(r"[/、+＋，,&]", str(b["club"] or "")):
+                pc, pn = split(part)
+                if not pc and pn:
+                    pc = top(name_code.get(pn, Counter()))
+                    if not pc:
+                        for cc, nn in code_name.items():
+                            t = top(nn)
+                            if t and len(t) >= 2 and len(pn) >= 2 and (t in pn or pn in t):
+                                pc = cc
+                                break
+                if pc and pc not in codes:
+                    codes.append(pc)
+            b["clubCodes"] = codes
         if not re.fullmatch(r"[A-E]\d{2}", s["code"] or ""):
             s["code"] = s["blocks"][0]["clubCode"] if s["blocks"] else ""
         move_event_roles(s)

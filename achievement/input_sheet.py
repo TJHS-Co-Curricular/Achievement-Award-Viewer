@@ -2,7 +2,7 @@
 方便复制贴到 Google 表格。
 
 - 栏位：序、学号、班级、姓名，然后每个年份一组：执委（数量）、中层管理（数量）、筹委（数量）、
-  服务（小时）、活动/工作/比赛（例 4/6/2；工作 = 团内工作 + 特殊的服务，例常不算，见 config/work.json）。
+  服务（小时）、活动/工作/比赛（例 4/6/2；活动 = 比赛和服务以外的栏目，工作 = 服务栏，见 config/work.json）
 - 数字由系统计算，已套用「计入 / 不计」手动调整；该年没有履历的格子放 0，并用红色标出。
 - 年份栏预设自动：Result 里最新的年份 = 高三，往前推高二、高一……（config/config.ini 的 [input_sheet] 可改）。
 """
@@ -21,6 +21,7 @@ FIELDS = [
     {"k": "mid", "t": "中层管理", "u": "数量"},
     {"k": "comm", "t": "筹委", "u": "数量"},
     {"k": "hours", "t": "服务", "u": "小时"},
+    {"k": "svc", "t": "服务", "u": "数量"},       # 维护者 2026-09-28：例常不算、同一年同一项只算 1 个
     {"k": "awc", "t": "活动/工作/比赛", "u": ""},
 ]
 INFO_COLS = ["序", "学号", "班级", "姓名(中)"]
@@ -80,6 +81,8 @@ def ordered_students(students: list) -> list:
 def _field(st: dict, k: str):
     if k == "role":
         return st["roles"]
+    if k == "svc":
+        return st["svcN"]
     if k == "awc":   # 活动/工作/比赛，例 4/6/2（工作的定义在 config/work.json）
         return f'{st["acts"]}/{st["work"]}/{st["extComp"] + st["intComp"]}'
     v = st[k]

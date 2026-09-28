@@ -5,7 +5,7 @@ const $=s=>document.querySelector(s);
 const A=window.App;if(!A||!$('#tab-input'))return;
 const esc=A.esc;
 const INFO_W=[40,58,54,76];                 // 序、学号、班级、姓名 的宽度（固定在左边）
-const FIELD_DEF=[{k:'role',t:'执委',u:'数量'},{k:'mid',t:'中层管理',u:'数量'},{k:'comm',t:'筹委',u:'数量'},{k:'hours',t:'服务',u:'小时'},{k:'awc',t:'活动/工作/比赛',u:''}];
+const FIELD_DEF=[{k:'role',t:'执委',u:'数量'},{k:'mid',t:'中层管理',u:'数量'},{k:'comm',t:'筹委',u:'数量'},{k:'hours',t:'服务',u:'小时'},{k:'svc',t:'服务',u:'数量'},{k:'awc',t:'活动/工作/比赛',u:''}];
 let CFG=(window.EMBED_INPUT&&window.EMBED_INPUT.config)||null, q='', ROWS=[];
 
 // 年份栏由程序按 Result 里最新的年份自动排（或 config.ini 手动指定）；资料更新时重新取一次
@@ -18,7 +18,7 @@ async function loadConfig(force){
 // 每位学生每一年的数字（该年没有履历 → 放 0，红色标出）
 function val(st,f){
   if(f==='awc')return `${st.acts}/${st.work}/${st.extComp+st.intComp}`;   // 活动/工作/比赛（工作的定义在 config/work.json）
-  const v={role:st.roles,mid:st.mid,comm:st.comm,hours:st.hours}[f];
+  const v={role:st.roles,mid:st.mid,comm:st.comm,hours:st.hours,svc:st.svcN}[f];
   return v==null?'':Math.round(v*100)/100;
 }
 function build(){

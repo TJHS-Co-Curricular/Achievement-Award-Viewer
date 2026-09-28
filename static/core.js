@@ -22,10 +22,10 @@
   }
   function computeStats(s,ov,year){
     const bl=s.blocks.filter(b=>!year||b.year==year);
-    const c={roles:0,mid:0,comm:0,extComp:0,intComp:0,extAct:0,intAct:0,extSvc:0,intSvc:0,team:0,badge:0,honor:0,unsure:0,extAwards:0,intAwards:0,work:0,acts:0};
+    const c={roles:0,mid:0,comm:0,extComp:0,intComp:0,extAct:0,intAct:0,extSvc:0,intSvc:0,team:0,badge:0,honor:0,unsure:0,extAwards:0,intAwards:0,work:0,acts:0,svcN:0};
     let hours=0;const roleByBlock=new Map(),midByBlock=new Map();
     for(const b of bl){
-      for(const [k,arr] of Object.entries(b.cats))arr.forEach((t,i)=>{const x=itemState(s,b,k,i,ov);if(x.unsure)c.unsure++;if(x.inc){if(k in c)c[k]++;const wk=b.wk&&b.wk[k];if(wk&&wk[i]===1)c.work++;else if((k==='extAct'||k==='intAct')&&!(wk&&wk[i]))c.acts++;if((k==='extComp'||k==='intComp')&&b.aw[k][i])c[k==='extComp'?'extAwards':'intAwards']++}});
+      for(const [k,arr] of Object.entries(b.cats))arr.forEach((t,i)=>{const x=itemState(s,b,k,i,ov);if(x.unsure)c.unsure++;if(x.inc){if(k in c)c[k]++;const sc=b.sc&&b.sc[k];if(sc&&sc[i]===1)c.svcN++;const wk=b.wk&&b.wk[k];if(wk&&wk[i]===1)c.work++;else if(wk&&wk[i]===3)c.acts++;if((k==='extComp'||k==='intComp')&&b.aw[k][i])c[k==='extComp'?'extAwards':'intAwards']++}});
       const r=rolesFrom((b.cats.role||[]).map((t,i)=>itemState(s,b,'role',i,ov).inc?b.rc[i]:null));roleByBlock.set(b,r.list);midByBlock.set(b,r.mid);c.roles+=r.count;c.mid+=r.mid.length;
       if(b.exBlock)continue;
       // 服务时数 = 该年采用的时数（自填总数优先），再扣掉不计入的服务项
