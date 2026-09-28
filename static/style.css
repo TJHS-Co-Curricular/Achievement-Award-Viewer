@@ -231,3 +231,38 @@ body.resizing .drawer{transition:none}
 #tbl td.role{max-width:170px;min-width:110px}
 #tbl .hbar{gap:6px}
 #tbl .hbar .track{width:48px}
+
+/* ===== 输入资料（按评审表格式排列的统计）===== */
+.inhead{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;margin:2px 0 10px}
+.inhead b{font-size:16px}
+.intip{font-size:12px;color:var(--muted)}
+.inbtns{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto}
+.inwrap{max-height:calc(100vh - 210px)}
+#intbl{width:max-content;min-width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
+#intbl th,#intbl td{padding:5px 6px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);white-space:nowrap}
+#intbl thead th{position:sticky;background:var(--surface-2);text-align:center;cursor:default;font-size:12px;line-height:1.25;vertical-align:middle;z-index:2}
+#intbl thead tr:first-child th{top:0}
+#intbl thead tr:nth-child(2) th{top:29px}
+#intbl thead th span{display:block;font-weight:400;font-size:10.5px;color:var(--muted)}
+#intbl th.iyh{background:var(--warn-soft);color:var(--text);border-left:2px solid var(--text-2);height:29px;box-sizing:border-box}
+#intbl th.iyh span{display:inline;margin-left:2px;font-size:12px;color:var(--text-2)}
+#intbl th.ifh{min-width:52px;max-width:60px;white-space:normal;background:var(--warn-soft)}
+#intbl th.ifh.alt,#intbl th.iyh.alt{background:var(--surface-2)}
+#intbl .first{border-left:2px solid var(--text-2)}
+#intbl .fix{position:sticky;background:var(--surface);z-index:1;overflow:hidden;text-overflow:ellipsis}
+#intbl thead th.fix{z-index:3;background:var(--surface-2)}
+#intbl .fixlast{border-right:2px solid var(--text-2)}
+#intbl td.fix a{color:var(--text);text-decoration:none;font-weight:600}
+#intbl td.fix a:hover{color:var(--accent-ink);text-decoration:underline}
+#intbl td.in{text-align:center;min-width:44px;font-variant-numeric:tabular-nums}
+#intbl td.in.alt{background:color-mix(in srgb,var(--surface-2) 45%,transparent)}
+#intbl td.in.zero{color:var(--muted)}
+#intbl td.in.miss{background:#fde2e2;color:#c62828;font-weight:600}
+#intbl tr.nodata td.fix,#intbl tr.nodata td.fix a{background:#fde2e2;color:#c62828}
+.missnote{color:#c62828}
+:root[data-theme="dark"] #intbl td.in.miss,:root[data-theme="dark"] #intbl tr.nodata td.fix{background:#4a1f1f;color:#ff9a9a}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) #intbl td.in.miss,:root:not([data-theme="light"]) #intbl tr.nodata td.fix{background:#4a1f1f;color:#ff9a9a}}
+#intbl tbody tr:hover td:not(.miss),#intbl tbody tr:hover td.fix{background:var(--accent-soft)}
+@media print{#tab-input .filters{display:none}.inwrap{max-height:none}}
+
+.tag.wr{background:var(--surface-2);color:var(--text-2);border:1px dashed var(--line-strong)}

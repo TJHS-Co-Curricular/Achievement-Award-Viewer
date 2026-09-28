@@ -80,3 +80,4 @@ class Store:
         tmp.replace(p)
         log.info("手动调整已保存：%d 项 → %s", len(clean), p)
         return len(clean)
+

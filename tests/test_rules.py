@@ -85,6 +85,69 @@ class Awards(unittest.TestCase):
         self.assertIn("体育", rules.comp_judge("参与运动会跳高比赛", "A01"))
 
 
+class Work(unittest.TestCase):
+    """资料总览的「工作」（config/work.json）"""
+
+    def judge(self, text, cat="intSvc"):
+        from achievement import work_rules
+        return work_rules.get().judge(text, cat)[0]
+
+    def test_routine_not_work(self):
+        self.assertFalse(self.judge("参与周会站岗服务"))          # 维护者：周会每个月都有，算例常
+        self.assertFalse(self.judge("例常早操服务（2小时）"))
+        self.assertTrue(self.judge("周会演出"))                   # 周会上的演出是特殊的
+
+    def test_special_is_work(self):
+        self.assertTrue(self.judge("校园大扫除（5小时）"))
+        self.assertTrue(self.judge("文娱汇演《聚星》——演员", "team"))
+        self.assertTrue(self.judge("接待台湾永平高中交流团", "extAct"))   # 活动栏的接待改算工作
+        self.assertFalse(self.judge("参与台湾交流会", "extAct"))          # 活动栏的交流 → 活动
+
+    def test_performance_in_activity_is_work(self):
+        self.assertTrue(self.judge("2026 年文东文化交流演出活动 —— 演员。", "extAct"))
+        self.assertFalse(self.judge("观看《颂》天地人和民族乐团演出。", "extAct"))   # 观看 → 还是活动
+
+    def test_same_work_once_per_year(self):
+        # 同一年搬椅子写了 5 次 → 只算 1 个工作；不同年份各算
+        svc = ["%d/6 搬椅子服务（1小时）" % d for d in range(1, 6)] + ["校园开放日服务"]
+        blk = lambda y: {"year": y, "clubCode": "A01", "clubName": "学长团", "exBlock": None, "hours": 6,
+                         "cats": {"intSvc": list(svc)}}
+        s = {"sid": "1", "blocks": [blk(2025), blk(2026)]}
+        rules.compute_exclusions(s)
+        for y in (2025, 2026):
+            st, _ = rules.compute_stats(s, {}, y)
+            self.assertEqual(st["work"], 2)
+            self.assertEqual(st["intSvc"], 6)        # 服务条数、时数照算
+
+    def test_same_competition_each_year(self):
+        # 不同比赛底下都写「自选南棍—第一名」：同一年同一栏重复出现，各自计算（吴则融 20390）
+        blk = lambda y: {"year": y, "clubCode": "C06", "clubName": "中华武术团", "exBlock": None,
+                         "cats": {"extComp": ["全国赛", "自选南棍—第一名", "州赛", "自选南棍—第一名"]}}
+        s = {"sid": "1", "blocks": [blk(2025), blk(2026)]}
+        rules.compute_exclusions(s)
+        for b in s["blocks"]:
+            self.assertFalse(any("重复" in (e or "") for e in b["ex"]["extComp"]))
+
+
+class SheetYears(unittest.TestCase):
+    """资料总览的年份栏：自动以 Result 里最新的年份当高三，往前推"""
+
+    def test_auto_years(self):
+        from achievement import input_sheet, settings
+        st = settings.Settings()
+        cols = input_sheet.year_columns(st, [{"blocks": [{"year": 2027}, {"year": 2025}]}])
+        self.assertEqual(cols[0][:2], ("2027", "高三"))
+        self.assertEqual(cols[5][:2], ("2022", "初一 MCO"))     # 特别标注跟着年份走
+        cfg = input_sheet.sheet_config(st, [{"blocks": [{"year": 2026}]}])
+        self.assertEqual([y["y"] for y in cfg["years"]][:2], ["2026", "2025"])
+        self.assertTrue(cfg["years"][-1]["optional"])          # 留级：没资料不标红
+
+    def test_manual_years(self):
+        from achievement import input_sheet, settings
+        st = settings.Settings(sheet_years=[("2026", "高三"), ("2025", "高二")])
+        self.assertEqual([y for y, _, _ in input_sheet.year_columns(st, [])], ["2026", "2025"])
+
+
 class Hours(unittest.TestCase):
     def test_parse_hours(self):
         self.assertEqual(rules.parse_hours("3小时"), 3.0)
@@ -92,6 +155,12 @@ class Hours(unittest.TestCase):
         self.assertEqual(rules.parse_hours("60M / 120M"), 1.0)
         self.assertEqual(rules.parse_hours("（11h，筹备6h，活动5h）"), 11.0)   # 总数 + 细分 → 只算总数
         self.assertEqual(rules.parse_hours("2小时35分钟+ 9小时50分钟"), 12.42)
+
+    def test_declared_total(self):
+        # 标题「总服务时数：168小时」下面又写「1. 168小时」→ 只算一次（何伟琦 21824）
+        self.assertEqual(rules._declared_total([168.0, 168.0]), 168.0)
+        self.assertEqual(rules._declared_total([168.0, 100.0, 68.0]), 168.0)   # 总数 + 细分
+        self.assertEqual(rules._declared_total([48.0, 20.0]), 68.0)            # 分开写校内、校外 → 相加
 
 
 class Reference2025(unittest.TestCase):
@@ -233,6 +302,11 @@ class Structure(unittest.TestCase):
             r = c.post("/api/overrides", json={"a": "in", "b": "bad"})
             self.assertEqual(r.get_json()["count"], 1)
             self.assertTrue(dirs.overrides.is_file())
+            # 资料总览（评审表格式）
+            d = c.get("/api/input").get_json()
+            self.assertEqual(len(d["config"]["fields"]), 5)
+            self.assertTrue(d["config"]["years"])
+            self.assertEqual(c.get("/export/input.xlsx").status_code, 200)
 
 
 if __name__ == "__main__":

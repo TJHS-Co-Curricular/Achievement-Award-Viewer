@@ -1,19 +1,20 @@
 # 学生资料（个人资料，不上传）
 Result/
-成就奖_手动调整.json
 
-# 运行时文件夹（程序自动产生）
+# 运行时文件夹（程序自动产生：手动调整、导出、日志）
 data/
 output/
 logs/
 
-# 导出 / 自动产生的文件
+# 旧版放在根目录的文件（新版已改放 data/、output/，留着以防旧文件被加进去）
+成就奖_手动调整.json
 成就奖履历总览*.html
-成就奖统计.xlsx
+成就奖统计*.xlsx
+Docs/generated/
 docs/generated/
 
-# 打包
-Individual's Utmost Achievement Calculator.exe
+# 打包（exe 很大，不进 git；要发给别人请用 GitHub Releases 或直接拷贝）
+*.exe
 .buildenv/
 .buildwork/
 build/
@@ -25,12 +26,19 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+.pytest_cache/
 
-# 系统 / Office 暂存档
+# 暂存档
+*.tmp
+*.log
 ~$*
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# 编辑器
+.vscode/
+.idea/
 
 # 其它
 Claude outputs/

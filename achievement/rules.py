@@ -96,6 +96,18 @@ def _s(v) -> str:
 
 
 # ---------------------------------------------------------------- 解析一张表
+def _declared_total(parts):
+    """「总服务时数」一格里有好几个数字时怎么算：
+    - 同一个数字重复写（例：标题「总服务时数：168小时」下面又写「1. 168小时」）→ 只算一次
+    - 第一个数字 = 后面几个相加（例：「总服务时数：168小时」下面写「校内 100小时」「校外 68小时」）→ 只算第一个
+    - 其它情况（例：分开写校内、校外时数）→ 相加"""
+    if len(parts) > 1 and all(abs(x - parts[0]) < 1e-6 for x in parts):
+        return parts[0]
+    if len(parts) > 2 and abs(parts[0] - sum(parts[1:])) < 1e-6:
+        return parts[0]
+    return sum(parts)
+
+
 def parse_rows(rows, is_pdf=False):
     yi, hi = 0, -1
     for r in range(min(len(rows), 30)):
@@ -147,7 +159,8 @@ def parse_rows(rows, is_pdf=False):
             if h is None and re.fullmatch(r"\d+(\.\d+)?", norm(t)):
                 h = float(norm(t))
             if h is not None:
-                blk["declaredTotal"] = (blk["declaredTotal"] or 0) + h
+                blk.setdefault("totalParts", []).append(h)
+                blk["declaredTotal"] = _declared_total(blk["totalParts"])
             st["last"] = None
             return
         blk["cats"].setdefault(k, []).append(t)
@@ -236,6 +249,7 @@ def parse_rows(rows, is_pdf=False):
         b["itemizedHours"] = round(itemized, 2) if anyh else None
         # 服务时数：优先用学生自填的「总服务时数」；该年没填才用逐项相加（上级 2026-09-24 定，对没逐项写时数的学生较公平）
         b["hours"] = round(b["declaredTotal"], 2) if b["declaredTotal"] is not None else b["itemizedHours"]
+        b.pop("totalParts", None)
         b["club"] = re.sub(r"\s+", " ", _s(b["club"] or "")).strip()
         if b["cats"] or b["hours"]:
             out.append(b)
@@ -462,6 +476,43 @@ def comp_judge(text, code):
     return award_rules.get().comp_judge(text, code)
 
 
+def _work_key(t):
+    """判断「同一条工作写了两次」用：去掉时数、日期、括号内容"""
+    t = re.sub(r"[（(][^）)]*[）)]", "", str(t))
+    t = re.sub(r"\d+(\.\d+)?\s*(小时|个小时|分钟|h|H|hrs?)", "", t)
+    t = re.sub(r"\d{1,4}\s*[/.-]\s*\d{1,2}(\s*[/.-]\s*\d{2,4})?", "", t)
+    t = re.sub(r"20\d\d\s*年?", "", t)
+    t = _simp(t)
+    return re.sub(r"(服务|工作)$", "", t)
+
+
+def _mark_work(b, seen):
+    """资料总览的「工作」：b["wk"][栏][i] = 1 算工作、2 = 是工作但同一年已算过、0 = 不是工作；
+    b["wr"][栏][i] = 说明（例常 / 活动改算工作 / 重复）。
+    规则在 config/work.json。"""
+    from . import work_rules
+    W = work_rules.get()
+    b["wk"], b["wr"] = {}, {}
+    for k in ("team", "intSvc", "extSvc", "intAct", "extAct"):
+        arr = b["cats"].get(k) or []
+        if not arr:
+            continue
+        wk, wr = [], []
+        for i, t in enumerate(arr):
+            ok, why = W.judge(t, k)
+            if ok and not b["ex"].get(k, [None] * len(arr))[i] and not b["exBlock"]:
+                # 同一年同一项工作写了好几次（例：不同日期的搬椅子服务、服务栏和团内工作栏都写了）→ 只算 1 个
+                grp = W.group(t)
+                key = f"{b['year']}|{'类:' + grp if grp else _work_key(t)}"
+                if len(key) > 6:
+                    if key in seen:
+                        ok, why = 2, (f"同一年「{grp}」已算过，只算 1 个工作" if grp else "同一年同一项工作已算过，只算 1 个")
+                    seen[key] = k
+            wk.append(2 if ok == 2 else 1 if ok else 0)   # 1 = 算工作；2 = 是工作但同一年已算过（也不算活动）
+            wr.append(why)
+        b["wk"][k], b["wr"][k] = wk, wr
+
+
 def _simp(t):
     t = norm(t)
     t = re.sub(r"^[\d.、，,]+", "", t)
@@ -580,6 +631,9 @@ def compute_exclusions(s):
                     seen[key] = (b, k, i)
                     continue
                 p = seen[key]
+                if p[0] is b and p[1] == k:
+                    # 同一学会同一栏里重复出现（例：不同比赛底下都写「自选南棍—第一名」）→ 各自计算，不当重复
+                    continue
                 from . import award_rules
                 A = award_rules.get()
                 own_new = A.own(b.get("clubCode"), t)
@@ -587,12 +641,15 @@ def compute_exclusions(s):
                 drop, keep = (p, (b, k, i)) if (own_new and not own_old) else ((b, k, i), p)
                 db, dk, di = drop
                 if not db["exBlock"] and not db["ex"][dk][di]:
-                    db["ex"][dk][di] = f"双学会重复，只计入 {keep[0].get('clubCode', '')}{keep[0].get('clubName', '')}"
+                    db["ex"][dk][di] = (f"同一年重复写（{CAT_LABEL.get(keep[1], keep[1])}已有），只计一次" if keep[0] is db
+                                        else f"双学会重复，只计入 {keep[0].get('clubCode', '')}{keep[0].get('clubName', '')}")
                 seen[key] = keep
     # 预先计算每条的属性，供网页即时重算用
+    work_seen = {}
     for b in s["blocks"]:
         b["aw"] = {k: [is_award(t) for t in b["cats"].get(k, [])] for k in ("extComp", "intComp") if k in b["cats"]}
         b["hr"] = {k: [parse_hours(t) for t in b["cats"].get(k, [])] for k in ("extSvc", "intSvc") if k in b["cats"]}
+        _mark_work(b, work_seen)
         b["rc"] = [classify_role(t, b.get("clubName") or b.get("club")) for t in b["cats"].get("role", [])]
         b["nk"] = {k: [norm(t) for t in arr] for k, arr in b["cats"].items()}
         mc, mr = set(b.get("movedComm") or []), set(b.get("movedRole") or [])
@@ -638,6 +695,11 @@ def compute_stats(s, ov=None, year=None):
                     c["unsure"] += 1
                 if x["inc"]:
                     c[k] += 1
+                    wk = (b.get("wk") or {}).get(k)
+                    if wk and wk[i] == 1:
+                        c["work"] += 1
+                    elif k in ("extAct", "intAct") and not (wk and wk[i]):
+                        c["acts"] += 1
                     if k in ("extComp", "intComp") and b["aw"][k][i]:
                         c["extAwards" if k == "extComp" else "intAwards"] += 1
         rl, rc, ml = standard_roles_from([b["rc"][i] for i in range(len(b["cats"].get("role", []))) if item_state(s, b, "role", i, ov)["inc"]])
@@ -653,7 +715,7 @@ def compute_stats(s, ov=None, year=None):
                 if not item_state(s, b, k, i, ov)["inc"] and b["hr"][k][i]:
                     h -= b["hr"][k][i]
         hours += max(0.0, h)
-    out = {k: c[k] for k in ("roles", "mid", "comm", "extComp", "intComp", "extAct", "intAct", "extSvc", "intSvc", "team", "badge", "honor", "unsure", "extAwards", "intAwards")}
+    out = {k: c[k] for k in ("roles", "mid", "comm", "extComp", "intComp", "extAct", "intAct", "extSvc", "intSvc", "team", "badge", "honor", "unsure", "extAwards", "intAwards", "work", "acts")}
     out["awards"] = out["extAwards"] + out["intAwards"]
     out["hours"] = round(hours, 2)
     return out, roles_by_block

@@ -13,7 +13,7 @@ from urllib.parse import quote
 
 from flask import Flask, Response, jsonify, render_template, request, send_file
 
-from . import __version__
+from . import __version__, input_sheet
 from .excel import write_xlsx
 from .paths import RESOURCE_DIR
 from .settings import Settings
@@ -42,7 +42,7 @@ def offline_name(dt=None) -> str:
     return f"成就奖履历总览_{export_stamp(dt)}.html"
 
 
-def render_offline(store: Store, dt=None) -> str:
+def render_offline(store: Store, dt=None, settings: Settings | None = None) -> str:
     """单一 HTML 文件：CSS / JS / 资料全部内嵌，双击即可离线查看。（要在 app context 里调用）"""
     static = RESOURCE_DIR / "static"
     inf = store.info()
@@ -52,6 +52,8 @@ def render_offline(store: Store, dt=None) -> str:
         inline_css=(static / "style.css").read_text(encoding="utf-8"),
         inline_core=(static / "core.js").read_text(encoding="utf-8"),
         inline_app=(static / "app.js").read_text(encoding="utf-8"),
+        inline_input=(static / "input.js").read_text(encoding="utf-8"),
+        input_json=_js({"config": input_sheet.sheet_config(settings or Settings(), store.students)}),
         favicon_svg=(static / "favicon.svg").read_text(encoding="utf-8"),
         data_json=_js(store.students), info_json=_js(inf), ov_json=_js(store.load_ov()),
     )
@@ -135,6 +137,20 @@ def create_app(store: Store, settings: Settings) -> Flask:
         ov = request.get_json(force=True, silent=True) or {}
         return jsonify(ok=True, count=store.save_ov(ov))
 
+    @app.route("/api/input")
+    def api_input():
+        """「资料总览」页的格式（年份栏等）；数字由网页用学生资料即时计算"""
+        store.refresh()
+        return jsonify(config=input_sheet.sheet_config(settings, store.students))
+
+    @app.route("/export/input.xlsx")
+    def export_input():
+        store.refresh()
+        log.info("下载 资料总览（评审表格式）")
+        cfg = input_sheet.sheet_config(settings, store.students)
+        return _xlsx_response(lambda b: input_sheet.write_xlsx(store.students, store.load_ov(), cfg, b),
+                              f"{cfg['title']}_{export_stamp()}.xlsx")
+
     @app.route("/export/excel")
     def export_excel():
         store.refresh()
@@ -164,7 +180,7 @@ def create_app(store: Store, settings: Settings) -> Flask:
         store.refresh()
         now = datetime.now()
         log.info("导出离线版 HTML")
-        return Response(render_offline(store, now), mimetype="text/html",
+        return Response(render_offline(store, now, settings), mimetype="text/html",
                         headers=_attachment(offline_name(now), f"achievement_{export_stamp(now)}.html"))
 
     return app
@@ -173,19 +189,22 @@ def create_app(store: Store, settings: Settings) -> Flask:
 # ---------------------------------------------------------------------------
 # 不开网站、直接写文件（--export / --list-roles / --list-awards）
 # ---------------------------------------------------------------------------
-def export_files(app: Flask, store: Store) -> list[Path]:
-    """离线版 HTML + Excel → output/"""
+def export_files(app: Flask, store: Store, settings: Settings | None = None) -> list[Path]:
+    """离线版 HTML + Excel + 资料总览（评审表格式）→ output/"""
     store.refresh(force=True)
     store.dirs.ensure("output")
     now = datetime.now()
     html = store.dirs.output / offline_name(now)
     with app.test_request_context():
-        html.write_text(render_offline(store, now), encoding="utf-8")
+        html.write_text(render_offline(store, now, settings), encoding="utf-8")
     xlsx = store.dirs.output / f"成就奖统计_{export_stamp(now)}.xlsx"
     write_xlsx(store.students, xlsx, store.load_ov())
-    for p in (html, xlsx):
+    cfg = input_sheet.sheet_config(settings or Settings(), store.students)
+    sheet = store.dirs.output / f"{cfg['title']}_{export_stamp(now)}.xlsx"
+    input_sheet.write_xlsx(store.students, store.load_ov(), cfg, sheet)
+    for p in (html, xlsx, sheet):
         log.info("已导出 %s", p)
-    return [html, xlsx]
+    return [html, xlsx, sheet]
 
 
 def write_reference(store: Store, kind: str) -> tuple[Path, int, dict]:

@@ -7,5 +7,5 @@
     - 次版本 +1：加新功能、改网页样式
     - 主版本 +1：文件结构或资料格式有不兼容的大改
 """
-__version__ = "1.1.0"
+__version__ = "1.3.4"
 APP_NAME = "Individual's Utmost Achievement Calculator"

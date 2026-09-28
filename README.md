@@ -1,14 +1,17 @@
-# 成就奖履历查看网站 (Achievement Viewer)
+# Achievement-Award-Viewer · 成就奖履历查看网站
+
+> 循人中学「高三最高成就奖」统计工具。当前版本见网页底部 / `achievement/__init__.py`，更新记录见 `CHANGELOG.md`，完整计分规则见 `Docs/成就奖计分规则.md`。
 
 `app.py` 是一个本地小网站，会读取 `Result/` 文件夹里每位学生的「联课活动个人表现履历表」
 （`.xlsx` / `.pdf`），按手册规则统计，在浏览器里显示：
 
 - 学生列表：搜索、按学会 / 班级 / 年份筛选、点表头排序（服务时数、职务、获奖…）
-- 个人完整履历：按年份分组，不计入的条目以灰色划线显示并注明原因
+- 个人完整履历：按年份分组，「简单 / 详细」切换；不计入的条目以灰色划线显示并注明原因
 - 最多 4 人并排对比、统计图表、资料问题清单
+- **资料总览**：把统计按学校评审 Google 表格的格式排好（各年执委 / 中层管理 / 筹委 / 服务 / 活动/工作/比赛；年份自动；没资料的年份放 0 标红），一键复制贴到 Google 表格或下载 Excel
 - 手动「计入 / 不计」：自动保存到 `data/成就奖_手动调整.json`，下次打开照样套用
 - **自动载入**：网站开着的时候，往 `Result/` 新增、修改、删除履历表，网页几秒内自动更新
-- 下载 Excel（总表 + 明细 + 计分规则）、导出离线版 HTML（单一文件，可发给别人）
+- 下载 Excel（总表 + 明细 + 计分规则）、下载职位一览 / 获奖一览（供校对）、导出离线版 HTML（单一文件，可发给别人）
 
 有两种使用方式：**A) 直接用 Python 运行**，或 **B) 打包成一个不需要 Python 的 .exe**，
 两者显示的内容完全一样。
@@ -18,17 +21,19 @@
 ## 项目文件结构
 
 ```
-Individual's Utmost Achievement/
+Achievement-Award-Viewer/
 ├─ app.py                  程序入口（只有几行，真正的程序在 achievement/）
 ├─ config/                 ★ 设定与规则表——所有 .ini / .json 设定都在这里，平时只改这里
 │   ├─ config.ini             网站设定：只限本机 / 局域网、端口、自动开浏览器、Result / 导出位置
 │   ├─ member_rules.json      执委 / 职务归类（执委、主席级、中层管理、会员、筹委、不计）
-│   └─ award.json             比赛规则（算不算获奖 ★、是不是代表本学会）
+│   ├─ award.json             比赛规则（算不算获奖 ★、是不是代表本学会）
+│   └─ work.json              资料总览「工作」的规则（哪些栏目算工作、哪些是例常不算）
 ├─ achievement/            程序（Python 套件），平时不用改
 │   ├─ __init__.py            版本号 __version__（只在这里改）
 │   ├─ cli.py                 启动：参数、启动画面、开网站 / 导出
 │   ├─ web.py                 网站：网页、API、下载与导出
 │   ├─ store.py               网站资料：读取 Result（有变动才重读）、手动调整
+│   ├─ input_sheet.py         「资料总览」页（评审表格式）的栏位与 Excel
 │   ├─ paths.py               所有文件夹位置（config / Result / data / output / logs）
 │   ├─ logs.py                运行日志 logs/app.log
 │   ├─ settings.py            读取 config/config.ini
@@ -36,22 +41,23 @@ Individual's Utmost Achievement/
 │   ├─ rules.py               计分流程（服务时数、B 类、双学会重复等），职位 / 比赛部分照 config/ 执行
 │   ├─ member_rules.py        读取 config/member_rules.json
 │   ├─ award_rules.py         读取 config/award.json
+│   ├─ work_rules.py          读取 config/work.json
 │   ├─ engine.py              整个文件夹的读取、多线程解析、缓存
 │   └─ excel.py               生成 Excel 统计表
 ├─ templates/              网页 HTML 模板（base.html、index.html）
-├─ static/                 网页样式与脚本（style.css、app.js、core.js、favicon.svg）
+├─ static/                 网页样式与脚本（style.css、app.js、core.js、input.js（资料总览）、favicon.svg）
 ├─ scripts/
 │   ├─ build_exe.bat          一次性打包成 .exe（见下方「方式 B」）
 │   ├─ start_lan.bat          局域网共享启动（让同事用 IP 访问）
 │   └─ allow_firewall.bat     开防火墙端口（以系统管理员身份执行，只在需要时用）
 ├─ tests/
 │   └─ test_rules.py          自动测试：python -m unittest discover tests -v
-├─ Docs/                   文档（计分规则、供校对的 Word 等）
+├─ Docs/                   文档：成就奖计分规则.md（完整规则）、履历表指南.md（学生填写范例）、供校对的 Word
 ├─ Result/                 你的资料（每位学生一份履历表），不进 git
 │
 │  ↓ 运行时自动产生（python 版和 exe 版一样，都在程序旁边；不进 git）
 ├─ data/                   成就奖_手动调整.json（网页里的「计入 / 不计」）
-├─ output/                 导出：离线版 HTML、Excel、已知职位一览、已知获奖一览
+├─ output/                 导出：离线版 HTML、Excel、资料总览 Excel、已知职位一览、已知获奖一览
 ├─ logs/                   运行日志 app.log（出问题时把它发给维护的人）
 │
 ├─ CHANGELOG.md            更新记录（每个版本改了什么）
@@ -73,9 +79,9 @@ Individual's Utmost Achievement/
 「下载职位一览 / 获奖一览」（`--list-roles` / `--list-awards`）会读全部届别，每一届的出现次数另列一栏（`2025届`、`2026届`）。
 Result 里直接放履历表的话，照旧只读 Result 本身。
 
-打包后只需要 `Individual's Utmost Achievement Calculator.exe` 和 `Result/` 放在一起（`data/`、`output/`、`logs/` 会自动产生）；`templates/`、`static/`、
+打包后只需要 `Achievement-Award-Viewer.exe` 和 `Result/` 放在一起（`data/`、`output/`、`logs/` 会自动产生）；`templates/`、`static/`、
 `config/` 已经封装在 exe 里面。要在 exe 版改规则：在 exe 旁边建一个 `config/` 文件夹，放入改好的
-`member_rules.json` / `award.json`，就会优先采用，不必重新打包。
+`member_rules.json` / `award.json` / `work.json` / `config.ini`，就会优先采用，不必重新打包。
 
 ### 修改职位规则（config/member_rules.json）
 
@@ -94,6 +100,23 @@ Result 里直接放履历表的话，照旧只读 Result 本身。
 - 例：舞蹈团学生的某个比赛被判成「非代表本学会」，但其实是舞蹈比赛 → 在「五」的「各学会关键词」→ C04 的「关键词」加上那个比赛的字眼。
 - 例：要让「参与奖」不算获奖，在「一、不算获奖（例外）」的「包含任一」加上 `"参与奖"`；要让「Participation」算获奖，加在「二」的「包含任一」。
 - 想看每个比赛条目目前算不算获奖：网页右上角「下载获奖一览」，或 `python app.py --list-awards`（存成 `output/已知获奖一览.xlsx`）。
+
+### 修改「工作」的规则（config/work.json）
+
+资料总览「活动/工作/比赛」里的「工作」= 表演 / 演员、服务 / 大扫除、接待 / 交流这类特殊的工作（算条数，和服务时数无关）。
+
+- 分四部分：一、算工作的栏目（预设：团内工作/表演、校内服务、校外服务）　二、例常（不算工作，例：周会）　三、活动栏里算工作（例：接待、演出 / 表演）　四、同一类算一个（例：搬 / 排 / 收椅子）。
+- 同一年同一项工作写了好几次只算 1 个；写法一样的自动合并，写法不同但同一类的写在「四」。
+- 例：图书馆轮值其实不是例常 → 在「二、例常」删掉「图书馆轮值」那一条；要让「校园布置」同一年只算一个 → 在「四」加一条 `{"名称": "校园布置", "包含任一": ["校园布置"]}`。
+- 每一条被判断成什么，打开个人页「详细」就看得到（例：「例常（周会），不算工作」「同一年『搬 / 排 / 收椅子』已算过，只算 1 个工作」）。
+
+### 资料总览（贴到 Google 表格）
+
+- 网页「资料总览」分页：序、学号、班级、姓名 + 每年一组「执委 / 中层管理 / 筹委 / 服务（小时）/ 活动/工作/比赛」，学生按学会代号 → 学号排序。
+- 年份自动：Result 里最新的年份当「高三」往前推；特别标注（例：2022 的 MCO）在 `config.ini` 的 `year_notes`。
+- 那一年没资料 → 放 0 并标红（留级那栏不标红）。
+- 「复制全部」贴到 Google 表格「序」的第一格；「只复制数字」贴到第一位学生的第一个「执委」格。贴之前先把「活动/工作/比赛」那几栏设成「格式 → 数字 → 纯文本」，免得 `4/6/2` 被当成日期。
+- 也可以「下载 Excel」（同样格式）；`python app.py --export` 会一起导出到 `output/`。
 ---
 
 ## 方式 A：直接用 Python 运行
@@ -112,14 +135,14 @@ python app.py
 
 1. 在任何一台装有 Python 的 Windows 电脑上（安装 Python 时勾选 **"Add python.exe to PATH"**），
    双击 `scripts\build_exe.bat`（exe 会产生在项目根目录，和 `Result/` 放在一起）。
-2. 等它跑完（约 1-3 分钟），项目根目录里会出现 `Individual's Utmost Achievement Calculator.exe`。
-3. 把 `Individual's Utmost Achievement Calculator.exe` 和 `Result/` 放在同一层，双击 exe 即可——
+2. 等它跑完（约 1-3 分钟），项目根目录里会出现 `Achievement-Award-Viewer.exe`。
+3. 把 `Achievement-Award-Viewer.exe` 和 `Result/` 放在同一层，双击 exe 即可——
    **这台或其他任何 Windows 电脑都不需要安装 Python**。
 
 分享给别人时，只要一起拷贝：
 
 ```
-Individual's Utmost Achievement Calculator.exe
+Achievement-Award-Viewer.exe
 Result/
 data/                   ← 可选：你做过的「计入 / 不计」调整
 ```
@@ -139,6 +162,10 @@ data/                   ← 可选：你做过的「计入 / 不计」调整
 | `lan_allow_edit` | 局域网的同事可不可以改「计入 / 不计」 | `no` |
 | `result_folder` | 履历表文件夹（相对路径或完整路径） | `Result` |
 | `output_folder` | 导出文件放哪里（相对路径或完整路径） | `output` |
+| `[input_sheet]` `years` | 「资料总览」页的年份栏：`auto` = Result 里最新的年份当高三往前推；也可手动写 `2026:高三, 2025:高二, …` | `auto` |
+| `[input_sheet]` `grades` / `year_notes` | 自动时的年级名称；某年的特别标注（例 `2022:MCO`） | 高三…留级；`2022:MCO` |
+| `[input_sheet]` `title` | 「资料总览」页的标题 | 最高成就奖评审 |
+| `[input_sheet]` `optional_grades` / `optional_years` | 大部分学生本来就没资料的年级 / 年份：没资料放 0 但不标红 | `留级` |
 
 写错的值会在黑色窗口提示，并改用预设值。exe 版：把改好的 `config.ini` 放在 exe 旁边的 `config\` 文件夹就会采用。
 启动参数会盖过设定：`--lan`、`--local`、`--port=5050`、`--no-browser`。
@@ -161,21 +188,27 @@ data/                   ← 可选：你做过的「计入 / 不计」调整
 ```
 python app.py "D:\某个地方\Result"      指定别的 Result 文件夹
 python app.py --dev                     显示每次请求记录（除错用）
-python app.py --export                  不开网站，直接导出离线版 HTML + Excel 到 output/
+python app.py --export                  不开网站，直接导出离线版 HTML + Excel + 资料总览 Excel 到 output/
+python app.py --list-roles              已知职位一览.xlsx → output/
+python app.py --list-awards             已知获奖一览.xlsx → output/
 python app.py --no-browser              不自动打开浏览器
 python app.py --version                 显示版本号
 python app.py --help                    所有参数
 ```
 
-exe 用法相同，例如 `Individual's Utmost Achievement Calculator.exe "D:\某个地方\Result"`。
+exe 用法相同，例如 `Achievement-Award-Viewer.exe "D:\某个地方\Result"`。
 
 ## 计分规则（摘要）
 
-职位与比赛规则在 `config/member_rules.json`、`config/award.json`，其它计分流程在 `achievement/rules.py`；完整规则见 `Docs/成就奖计分规则.md`，网页「说明」页和 Excel「计分规则」表也有说明。
+完整规则见 `Docs/成就奖计分规则.md`（网页「说明」页和 Excel「计分规则」表也有摘要）。实际的判断设定在 `config/` 的
+`member_rules.json`（职位）、`award.json`（比赛）、`work.json`（工作）；其它流程在 `achievement/rules.py`。
 
 1. 以班级为单位的内容、服务、活动、比赛不计；学会的筹委、团内工作照算。
 2. 只计 A、C、D、E 类；B 类（体育、学术培训队）整年不计。
-3. 同一年同一比赛写在两个学会时只计一次，保留与比赛相关的学会。
+3. 高三毕联会、感恩聚会、学会在运动会的义卖、教师节相关的校内服务不计。
 4. 比赛须代表本学会；与所属学会无关的个人比赛不计。按学会关键词自动判断，判断不了的标「待确认」，暂时计入。
-5. 执委/职务按手册统一写法；其它职位写成「执委(XXX,XXX)」；主席等没写正/副的当作「正」；合唱团音乐主席、节令鼓队长类等同主席；童军分团算会员；「监督/督导XX主席」算活动筹委；助理类、授课人类、队长类、监督/督导/顾问/教练/领队类、首席/组长/领养人类、家族职位、联课组别、校内服务负责人另计「中层管理」；感恩聚会不计。
-6. 服务时数优先用学生自填的总服务时数，没填则逐项相加；不计入的服务条目的小时数会扣除。
+   同一年同一比赛写在两个学会只计一次；比赛以年为单位，每年各自计算。
+5. 执委/职务按手册统一写法；其它职位写成「执委(XXX,XXX)」；没写正/副的当作「正」；助理、授课人、队长、监督 / 督导、首席 / 组长、
+   家族职位、校内服务负责人等另计「中层管理」；分团、职衔、培训、实习学长算会员；活动筹委团职位、监督XX主席、运动会职位移到筹委。
+6. 服务时数优先用学生自填的总服务时数（重复写的同一个数字只算一次），没填则逐项相加；不计入的服务条目的小时数会扣除。
+7. 资料总览：活动 = 活动栏条数；工作 = 团内工作 + 服务栏条数（例常不算、同一年同一项只算 1 个、活动栏的接待 / 演出改算工作）；比赛 = 比赛栏条数。

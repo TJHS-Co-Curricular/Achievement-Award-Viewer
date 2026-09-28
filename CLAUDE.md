@@ -6,11 +6,13 @@
 
 ## 1. 这是什么
 
-- **Individual's Utmost Achievement Calculator**（成就奖履历查看网站），维护者：ZhiJie Chong（循人中学 Tsun Jin High School）。
+- **Achievement-Award-Viewer**（启动画面名称 Individual's Utmost Achievement Calculator，成就奖履历查看网站），当前版本见 `achievement/__init__.py`（2026-09-28：v1.3.4），维护者：ZhiJie Chong（循人中学 Tsun Jin High School）。
 - 读取 `Result/` 里每位高三学生的「联课活动个人表现履历表」（`.xlsx` / `.pdf`），按**上级**（负责老师）定下的规则，
-  统计「高三最高成就奖」：执委/职务数、中层管理数、筹委数、服务时数、活动、团内工作、比赛与获奖。
-- 本地 Flask 网站 + 用 PyInstaller 打包成单一 exe（`scripts\build_exe.bat`），给不懂程序的老师双击使用。
-- GitHub：`TJHS-Co-Curricular/Individual-s-Utmost-Achievement`。`Result/`、`data/`、`output/`、`logs/` 不进 git（学生个人资料）。
+  统计「高三最高成就奖」：执委/职务数、中层管理数、筹委数、服务时数、活动、团内工作、比赛与获奖；
+  「资料总览」页按学校评审 Google 表格的格式输出每年数字，让维护者贴进 Google 表格。
+- 本地 Flask 网站 + 用 PyInstaller 打包成单一 exe（`scripts\build_exe.bat` → `Achievement-Award-Viewer.exe`），给不懂程序的老师双击使用。
+- 项目文件夹 / GitHub 仓库名：`Achievement-Award-Viewer`（2026-09-28 起，旧名 Individual's Utmost Achievement）。exe 不进 git（.gitignore 有 `*.exe`）。
+- GitHub：`TJHS-Co-Curricular/Achievement-Award-Viewer`。`Result/`、`data/`、`output/`、`logs/` 不进 git（学生个人资料）。
 
 ## 2. 和维护者沟通的方式
 
@@ -29,21 +31,23 @@ achievement/
   cli.py              参数（argparse）、启动画面、--export / --list-roles / --list-awards、开网站
   web.py              Flask：create_app(store, settings)、所有路由、离线版 HTML、导出
   store.py            Store：读取 Result（指纹有变才重读）、手动调整 data/成就奖_手动调整.json
+  input_sheet.py      「资料总览」页：按评审表格式排列的统计（栏位、排序、每年数字、Excel）
   paths.py            ★ 所有文件夹位置：APP_DIR / RESOURCE_DIR、config 查找顺序、data/output/logs、旧文件搬迁
   logs.py             logs/app.log（RotatingFileHandler 1MB×5），未捕获的错误也写进去
-  settings.py         读取 config/config.ini（[server] access/port/port_fallback/open_browser/lan_allow_edit；[data] result_folder/output_folder）
+  settings.py         读取 config/config.ini（[server] access/port/port_fallback/open_browser/lan_allow_edit；[data] result_folder/output_folder；[input_sheet] title/years/grades/year_notes/optional_grades/optional_years）
   reader.py           读 .xlsx（python-calamine）/ .pdf（pdfplumber）
   rules.py            计分流程：parse_rows、classify_role、standard_roles_from、move_event_roles、compute_exclusions、parse_hours、compute_stats …
   member_rules.py     读取 config/member_rules.json（职位归类、移栏、不计、特别标记）
   award_rules.py      读取 config/award.json（算不算获奖、是否代表本学会）
+  work_rules.py       读取 config/work.json（资料总览「工作」：哪些栏目算、例常不算、活动栏的接待改算工作）
   engine.py           整个文件夹：多线程解析 + (mtime,size) 缓存、年份子文件夹（届别）、folder_version 指纹（含规则文件）
-  excel.py            Excel 总表 / 明细 / 计分规则
-config/               ★ 所有 .ini / .json 设定都只放这里：config.ini、member_rules.json、award.json
+  excel.py            Excel 总表 / 明细 / 计分规则（RULES_TEXT 是给老师看的规则摘要，规则变了要一起改）
+config/               ★ 所有 .ini / .json 设定都只放这里：config.ini、member_rules.json、award.json、work.json
 templates/            base.html、index.html（Jinja；**不要用 Prettier 等格式化工具整理，会弄坏 {{ }}**）
-static/               app.js（界面）、core.js（浏览器端即时重算）、style.css、favicon.svg
+static/               app.js（界面）、core.js（浏览器端即时重算）、input.js（「资料总览」页，经 window.App 用 app.js 的资料）、style.css、favicon.svg
 scripts/              build_exe.bat、start_lan.bat、allow_firewall.bat（**必须纯 ASCII + CRLF 换行**）
-tests/test_rules.py   unittest：规则判断 + 结构（版本号、config 位置、运行时文件夹、路由）
-Docs/                 成就奖计分规则.md（完整规则）、给上级校对的 docx
+tests/test_rules.py   unittest：规则判断、工作 / 比赛 / 服务时数、资料总览年份、结构（版本号、config 位置、运行时文件夹、路由）
+Docs/                 成就奖计分规则.md（完整规则，给上级核对）、履历表指南.md（学生填写范例）、给上级校对的 docx（旧版，未跟着更新）
 运行时自动产生：data/（手动调整）、output/（导出）、logs/（日志）——python 版和 exe 版都在程序旁边
 ```
 
@@ -55,11 +59,12 @@ Docs/                 成就奖计分规则.md（完整规则）、给上级校�
 1. **职位 / 执委 / 筹委 / 中层管理 / 不计 / 特别标记** → 改 `config/member_rules.json`（五部分：一、不计 二、执委栏移到筹委栏 三、筹委栏移到执委栏 四、职位归类 五、特别标记；文件开头有「说明」）。
    每条规则的字段：`名称`、`包含任一`、`正则`、`并且包含任一`、`不包含`、`学会或内容包含任一`、`适用栏目`、`归类`、`例子` 等。
 2. **获奖 / 是否代表本学会** → 改 `config/award.json`。
+   **资料总览的「工作」**（例常、活动栏改算工作、同一类合并）→ 改 `config/work.json`。
 3. 只有 JSON 做不到的流程（服务时数、B 类、双学会重复、拆句）才改 `achievement/rules.py`。
 4. **浏览器端要同步**：`static/core.js` 的 `rolesFrom` 必须和 Python 的 `standard_roles_from` 结果一致（职务列表、数量、中层管理）。
-   每个 block 预先算好的字段：`b.rc`、`b.ex`、`b.aw`、`b.hr`、`b.sp`、`b.mv`、`b.nk`。
+   每个 block 预先算好的字段：`b.rc`、`b.ex`、`b.aw`、`b.hr`、`b.sp`、`b.mv`、`b.nk`、`b.wk` / `b.wr`（工作）。
 5. 每条上级确认的规则，在 `tests/test_rules.py` 加一个测试；然后跑 `python -m unittest discover tests -v`。
-6. 更新 `Docs/成就奖计分规则.md`（写明「上级定」和日期）；需要时用 `python app.py --list-roles` / `--list-awards` 产生参考清单到 `output/`。
+6. 更新说明：`Docs/成就奖计分规则.md`（写明「上级定」和日期）、网页「说明」页（templates/index.html 的 tab-help）、Excel 的 `excel.RULES_TEXT`、`README.md`；需要时用 `python app.py --list-roles` / `--list-awards` 产生参考清单到 `output/`。
 
 ## 5. 已确认的重要规则（摘要，细节看 Docs/成就奖计分规则.md）
 
@@ -74,9 +79,9 @@ Docs/                 成就奖计分规则.md（完整规则）、给上级校�
 - 不计：班级活动（含班级歌曲比赛、运动会写生/号码布/短片比赛）、B 类、高三毕联会（含编辑/广告/教师节工委会）、感恩聚会、
   学会在运动会的义卖、校内服务里的教师节相关、模范学长、教师节演出负责人、《校讯》主编。
 - 特别标记 ★（只标记不计分）：联课处工委、文娱工委、XXX志工工委、国际交流筹委/负责人。
-- 服务时数：优先学生自填总数；「11h，筹备6h，活动5h」这种「总数 + 细分」只算总数；被排除条目的时数要扣掉。
-- 比赛须代表本学会，判断不了标「待确认」暂时计入。
-- 还没得到上级答复：「二线执委--制服股」算不算中层管理；校内服务以外栏目的教师节条目；执委(A,B) 算 2、筹委每条算 1；资料问题：B08 C04 21806 蔡佳芯 的舞蹈团职位被读进 B08 那一格，需人工看原件。
+- 服务时数：优先学生自填总数；「11h，筹备6h，活动5h」这种「总数 + 细分」只算总数；「总服务时数」一格里同一个数字重复写只算一次（rules._declared_total）；被排除条目的时数要扣掉。
+- 比赛须代表本学会，判断不了标「待确认」暂时计入；以年为单位，每年各自算；同一学会同一栏重复的项目各自算。
+- 还没得到上级答复：「二线执委--制服股」算不算中层管理；校内服务以外栏目的教师节条目；执委(A,B) 算 2、筹委每条算 1；工作的例常清单（周会以外）和大扫除合并；活动栏的「交流」算不算工作；比赛一行算一个（比赛名称那一行也算）；资料问题：B08 C04 21806 蔡佳芯 的舞蹈团职位被读进 B08 那一格，需人工看原件。
 
 ## 6. 版本号与日志
 
@@ -91,4 +96,13 @@ Docs/                 成就奖计分规则.md（完整规则）、给上级校�
 - `python -m pyflakes app.py achievement` 没有警告（有装的话）；改了 JS 跑 `node --check static/app.js static/core.js`。
 - 开网站实际看一次（简单 / 详细页、学生列表在 1280 宽屏幕不用左右拉）。
 - 改了 `scripts\*.bat`：确认纯 ASCII、CRLF。
-- 需要的话更新 `README.md`、`Docs/成就奖计分规则.md`、这份 `CLAUDE.md`、`CHANGELOG.md`。
+- 更新说明文件：`README.md`、`Docs/成就奖计分规则.md`、网页「说明」页、`excel.RULES_TEXT`、这份 `CLAUDE.md`、`CHANGELOG.md`；Project 里的 `claude/成就奖计分规则.md`、`claude/CLAUDE_项目说明.md` 也同步。
+
+## 8. 「资料总览」页（v1.2.0 起）
+
+- 用途：把学生列表的统计按学校 Google 表格「2026 高三最高成就奖评审」的格式排好，让维护者复制贴进 Google 表格（**只显示，不能在网页里改**）。
+- 栏位：序、学号、班级、姓名(中)，每个年份一组：执委（数量）= 职务数、中层管理（数量）、筹委（数量）、服务（小时）、
+  活动/工作/比赛 = 三个数字分开写，例 4/6/2。工作（维护者 2026-09-28 定）= 表演/演员、服务/大扫除、接待/交流：团内工作栏 + 服务栏的条目，例常（周会等，见 config/work.json）不算；活动栏的「接待」「演出 / 表演 / 演员」（不含观看、集训、考试）改算工作；同一年同一项 / 同一类工作写几次都只算 1 个（「四、同一类算一个」：椅子、大扫除）（rules._mark_work → b.wk：1 算工作 / 2 同年已算过 / 0 不是工作；b.wr 说明；Python compute_stats 与 core.js 都有 work、acts）。活动 = 活动栏减去改算工作的；比赛 = 校内外比赛条数（参加就算，不只获奖）。比赛以年为单位：每年各自算，同一学会同一栏重复出现的项目各自算，「双学会重复」只用在两个学会。维护者定：该年没有履历的格子放 0 并用红色标出（网页 td.miss、Excel 红底）；全部年份都没资料的学生，名字也标红。留级（optional_grades）没资料只放 0、不标红。已套用「计入 / 不计」手动调整。
+- 没有「评审」「顾问建议」栏（维护者定：那两栏在 Google 表格里自己填）。
+- 排序：学会代号 → 学号。年份栏（维护者 2026-09-28 定：自动）：`years = auto` → Result 里最新的年份 = 高三，往前推 grades（高三…初一、留级）；`year_notes`（2022:MCO）跟着年份走；`optional_grades = 留级` 没资料不标红。input_sheet.year_columns / sheet_config(settings, students)，网页资料更新时重新取 /api/input。
+- 网页端（static/input.js）用 App.statsFor 计算；Excel（`/export/input.xlsx`，achievement/input_sheet.py）用 rules.compute_stats，两边数字必须一致。

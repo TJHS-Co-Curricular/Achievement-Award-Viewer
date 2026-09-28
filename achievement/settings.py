@@ -23,6 +23,13 @@ class Settings:
     lan_allow_edit: bool = False
     result_folder: str = "Result"
     output_folder: str = "output"
+    # 「资料总览」页的年份栏：预设自动（Result 里最新的年份 = 第一个年级，往前推）
+    sheet_title: str = "最高成就奖评审"
+    sheet_years: list | None = None     # None = 自动；手动时是 [(年份, 年级), ...]
+    sheet_grades: list = field(default_factory=lambda: ["高三", "高二", "高一", "初三", "初二", "初一", "留级"])
+    sheet_notes: dict = field(default_factory=lambda: {"2022": "MCO"})   # 年份的特别标注，接在年级后面
+    sheet_optional: list = field(default_factory=list)                    # 没资料放 0 但不标红的年份
+    sheet_optional_grades: list = field(default_factory=lambda: ["留级"])  # 同上，用年级指定（自动时用这个）
     source: Path | None = None
     warnings: list = field(default_factory=list)
 
@@ -70,4 +77,35 @@ def load() -> Settings:
     st.lan_allow_edit = _bool(srv.get("lan_allow_edit", "no"), False, "lan_allow_edit", w)
     st.result_folder = str(data.get("result_folder", st.result_folder)).strip() or "Result"
     st.output_folder = str(data.get("output_folder", st.output_folder)).strip() or "output"
+    sh = cp["input_sheet"] if cp.has_section("input_sheet") else {}
+    st.sheet_title = str(sh.get("title", st.sheet_title)).strip() or st.sheet_title
+    if str(sh.get("years", "auto")).strip().lower() in ("", "auto", "自动"):
+        st.sheet_years = None
+    else:
+        ys = []
+        for part in str(sh.get("years")).split(","):
+            part = part.strip()
+            if not part:
+                continue
+            y, _, lab = part.partition(":")
+            if not y.strip().isdigit():
+                w.append(f"input_sheet 的 years 里「{part}」看不懂（要写 年份:年级，例 2026:高三），已略过")
+                continue
+            ys.append((y.strip(), lab.strip()))
+        st.sheet_years = ys or None
+    split = lambda v: [x.strip() for x in str(v).replace("，", ",").split(",") if x.strip()]
+    if sh.get("grades"):
+        st.sheet_grades = split(sh.get("grades"))
+    if "year_notes" in sh:
+        st.sheet_notes = {}
+        for part in split(sh.get("year_notes")):
+            y, _, note = part.partition(":")
+            if y.strip().isdigit() and note.strip():
+                st.sheet_notes[y.strip()] = note.strip()
+            else:
+                w.append(f"input_sheet 的 year_notes 里「{part}」看不懂（要写 年份:标注，例 2022:MCO），已略过")
+    if "optional_years" in sh:
+        st.sheet_optional = split(sh.get("optional_years"))
+    if "optional_grades" in sh:
+        st.sheet_optional_grades = split(sh.get("optional_grades"))
     return st

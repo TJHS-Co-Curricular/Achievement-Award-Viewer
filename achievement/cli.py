@@ -141,10 +141,19 @@ def main(argv=None):
         print(f" [i] {n}")
         log.info(n)
     try:
-        from . import award_rules, member_rules
-        for label, p in (("职位规则", member_rules.path()), ("获奖规则", award_rules.path())):
-            print(f" {label}:          {p}")
-            log.info("%s：%s", label, p)
+        from . import award_rules, member_rules, work_rules
+        try:
+            wp = work_rules.path()
+        except FileNotFoundError:
+            wp = None
+            print(" 工作规则 (work):    （没找到 work.json：团内工作和服务全部算工作）")
+            log.warning("没找到 work.json")
+        for label, p in (("职位规则 (member):  ", member_rules.path()), ("获奖规则 (award):   ", award_rules.path()),
+                         ("工作规则 (work):    ", wp)):
+            if p is None:
+                continue
+            print(f" {label}{p}")
+            log.info("%s：%s", label.strip(), p)
             if paths.is_legacy_location(p):
                 print(f"   [!] 建议把 {p.name} 移进 config\\ 文件夹（放在程序根目录是旧的放法）")
     except Exception as e:  # noqa: BLE001
@@ -162,7 +171,7 @@ def main(argv=None):
                 print(f" 已把 {n} 项写进 {p}（{'、'.join(f'{k} {v}' for k, v in summ.items())}）")
         return
     if args.export:
-        for p in export_files(app, store):
+        for p in export_files(app, store, settings):
             print(f" 已导出：{p}")
         return
 

@@ -7,7 +7,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from . import award_rules, member_rules, rules
+from . import award_rules, member_rules, rules, work_rules
 from .reader import read_any
 
 _cache: dict[str, tuple[int, int, dict | None, str | None]] = {}
@@ -52,6 +52,7 @@ def folder_version(folder: Path) -> str:
     h = hashlib.md5()
     h.update(member_rules.fingerprint().encode("utf-8"))   # 改了 member_rules.json / award.json 也要重算
     h.update(award_rules.fingerprint().encode("utf-8"))
+    h.update(work_rules.fingerprint().encode("utf-8"))
     for p in list_files(folder):
         try:
             st = p.stat()

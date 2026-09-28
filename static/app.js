@@ -170,7 +170,7 @@ function openDrawer(s,jumpYear){
       const isComp=c.key==='extComp'||c.key==='intComp';
       const lis=b.cats[c.key].map((it,i)=>{const x=C.itemState(s,b,c.key,i,OV);
         const spl=b.sp&&b.sp[c.key]&&b.sp[c.key][i];
-        const tags=(spl?`<span class="tag sp" title="特别标记">★ ${esc(spl)}</span>`:'')+(x.inc?'':`<span class="tag ex">${esc(x.reason||'不计')}</span>`)+(x.unsure?'<span class="tag uns">待确认</span>':'')+(x.manual?'<span class="tag man">已手动调整</span>':'')+((c.key==='extSvc'||c.key==='intSvc')&&x.inc&&b.declaredTotal==null&&!(b.hr[c.key]&&b.hr[c.key][i])?'<span class="tag uns" title="这一项没有写小时数，服务时数按 0 计">未写时数</span>':'')+(b.mv&&b.mv[c.key]&&b.mv[c.key][i]?(c.key==='comm'?'<span class="tag mv" title="为活动而组成的筹委职位（含「监督/督导XX主席」），按规则从执委栏移到筹委">原写在执委栏</span>':'<span class="tag mv" title="监督/督导/顾问/教练/领队类（「监督XX主席」除外）算中层管理">原写在筹委栏</span>'):'');
+        const tags=(spl?`<span class="tag sp" title="特别标记">★ ${esc(spl)}</span>`:'')+(x.inc?'':`<span class="tag ex">${esc(x.reason||'不计')}</span>`)+(x.unsure?'<span class="tag uns">待确认</span>':'')+(x.manual?'<span class="tag man">已手动调整</span>':'')+(x.inc&&b.wr&&b.wr[c.key]&&b.wr[c.key][i]?`<span class="tag wr" title="资料总览「活动/工作/比赛」的「工作」判断（规则在 config/work.json）">${esc(b.wr[c.key][i])}</span>`:'')+((c.key==='extSvc'||c.key==='intSvc')&&x.inc&&b.declaredTotal==null&&!(b.hr[c.key]&&b.hr[c.key][i])?'<span class="tag uns" title="这一项没有写小时数，服务时数按 0 计">未写时数</span>':'')+(b.mv&&b.mv[c.key]&&b.mv[c.key][i]?(c.key==='comm'?'<span class="tag mv" title="为活动而组成的筹委职位（含「监督/督导XX主席」），按规则从执委栏移到筹委">原写在执委栏</span>':'<span class="tag mv" title="监督/督导/顾问/教练/领队类（「监督XX主席」除外）算中层管理">原写在筹委栏</span>'):'');
         const btn=b.exBlock?'':`<button class="tg" data-b="${s.blocks.indexOf(b)}" data-k="${c.key}" data-i="${i}">${x.inc?'不计':'计入'}</button>`;
         return `<li class="${x.inc?'':'ex'} ${spl?'spi':''} ${x.inc&&isComp&&C.isAward(it)?'aw':''}"><span class="it">${hi(it)}</span>${tags}${btn}</li>`}).join('');
       const nInc=b.cats[c.key].filter((it,i)=>C.itemState(s,b,c.key,i,OV).inc).length;
@@ -229,7 +229,7 @@ $('#funs').onchange=e=>{state.uns=e.target.checked;renderTable()};
 $('#fsp').onchange=e=>{state.sp=e.target.checked;renderTable()};
 
 // ----- tabs
-$$('.tab').forEach(t=>t.onclick=()=>{$$('.tab').forEach(x=>x.classList.toggle('on',x===t));['list','stats','issues','help'].forEach(n=>$('#tab-'+n).classList.toggle('hidden',n!==t.dataset.tab));if(t.dataset.tab==='stats')renderStats();});
+$$('.tab').forEach(t=>t.onclick=()=>{$$('.tab').forEach(x=>x.classList.toggle('on',x===t));['list','input','stats','issues','help'].forEach(n=>{const el=$('#tab-'+n);if(el)el.classList.toggle('hidden',n!==t.dataset.tab)});if(t.dataset.tab==='stats')renderStats();document.dispatchEvent(new CustomEvent('app:tab',{detail:t.dataset.tab}))});
 
 // ----- charts (single-series horizontal bars, hover tooltip)
 const tip=$('#tip');
@@ -277,7 +277,9 @@ function renderInfo(){
   const base=`${ALL.length} 位学生 · 读取 ${INFO.files} 个文件 · ${window.LIVE?'载入于':'生成于'} ${INFO.when}${INFO.fail&&INFO.fail.length?' · '+INFO.fail.length+' 个文件读取失败（见资料问题）':''}${Object.keys(OV).length?' · 手动调整 '+Object.keys(OV).length+' 项':''}`;
   $('#srcinfo').innerHTML=window.LIVE?`<span class="dot ${LIVE_OK?'':'off'}"></span>${LIVE_OK?'自动载入中':esc(LAST_ERR||OFFLINE_TIP)+'（会自动重试）'} · ${esc(base)}`:esc(base+'　（按 / 快速搜索）');
 }
-function init(){C.index(ALL);ALL.forEach(s=>delete s._hay);SC.clear();fillFilters();renderInfo();renderIssues();renderTable();if(!$('#tab-stats').classList.contains('hidden'))renderStats()}
+function init(){C.index(ALL);ALL.forEach(s=>delete s._hay);SC.clear();fillFilters();renderInfo();renderIssues();renderTable();if(!$('#tab-stats').classList.contains('hidden'))renderStats();document.dispatchEvent(new Event('app:data'))}
+// 给其它页面脚本（input.js「资料总览」页）用的小接口
+window.App={get students(){return ALL},statsFor,esc,toast:(m,e)=>toast(m,e),openStudent:id=>{const s=ALL.find(x=>(x.sid||x.file)===id);if(s)openDrawer(s)}};
 let LIVE_OK=true,VER=INFO.version||null,tt=null;
 function toast(msg,err){const el=$('#toast');el.textContent=msg;el.classList.toggle('err',!!err);el.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>el.classList.remove('on'),2500)}
 let FAILS=0,LAST_ERR='';
