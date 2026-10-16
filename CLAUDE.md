@@ -127,7 +127,7 @@ node --check static/app.js static/core.js static/input.js   # 改了 JS 才跑
 - **不要把学生资料推上 git：** `Result/`、`data/`、`output/`、`logs/` 都是学生个人资料，`.gitignore` 已经排除。exe 也不进 git。
 - **不要自己发明规则。** 规则一律以上级 / 维护者的决定为准（写在 `Docs/成就奖计分规则.md` 的决定记录里）。
 - **不要用 Prettier 等格式化工具整理 `templates/*.html`**，会弄坏 Jinja 的 `{{ }}`。
-- **`scripts\*.bat` 必须纯 ASCII + CRLF 换行。** 不要写中文，不要改成 LF。
+- **`scripts\*.bat` 必须纯 ASCII + CRLF 换行。** 不要写中文，不要改成 LF。`.gitattributes` 已设定 `*.bat text eol=crlf`，git 取出文件时会自动转成 CRLF（git 内部仍存 LF，这是正常的）。
 - **所有设定文件只能放在 `config/`**（测试会检查位置）。不要把 .ini / .json 放回根目录。
 - **版本号只在 `achievement/__init__.py` 改**，不要在别处写死。
 - **JSON 规则文件给非程序员手改：** 保持中文字段名和「说明」段，不要改字段名或结构；改结构要同时改对应的 `*_rules.py` 并保持向下兼容。
