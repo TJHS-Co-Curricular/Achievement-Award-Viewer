@@ -1,7 +1,7 @@
 # CLAUDE.md —— Achievement-Award-Viewer 项目规范
 
 > Claude Code 每次打开这个项目都会读这份文件。**改了项目结构、规则流程或工作习惯，请同步更新这份文件。**
-> 完整计分规则在 `Docs/成就奖计分规则.md`；每个版本改了什么在 `CHANGELOG.md`；一次性交接在 `HANDOFF.md`（如果还在）。
+> 完整计分规则在 `docs/成就奖计分规则.md`；每个版本改了什么在 `CHANGELOG.md`；一次性交接在 `HANDOFF.md`（如果还在）。
 
 ## 1. 项目概要
 
@@ -60,7 +60,7 @@ templates/            base.html、index.html（Jinja）
 static/               app.js（界面）、core.js（浏览器端即时重算）、input.js（资料总览页）、style.css、favicon.svg
 scripts/              build_exe.bat、start_lan.bat、allow_firewall.bat
 tests/test_rules.py   unittest：规则判断、工作 / 比赛 / 服务时数、资料总览年份、结构（版本号、config 位置、运行时文件夹、路由）
-Docs/                 成就奖计分规则.md（完整规则，给上级核对）、履历表指南.md（学生填写范例）、给上级校对的 docx（旧版）
+docs/                 成就奖计分规则.md（完整规则，给上级核对）、履历表指南.md（学生填写范例）、给上级校对的 docx（旧版）
 运行时自动产生（不进 git）：data/（手动调整）、output/（导出）、logs/（日志）—— python 版和 exe 版都放在程序旁边
 Result/               学生履历表（不进 git）。有年份子文件夹（Result/2024、2025、2026）时网站读最新一届
 ```
@@ -119,13 +119,13 @@ node --check static/app.js static/core.js static/input.js   # 改了 JS 才跑
 2. 有装 pyflakes 就跑一次，没有警告；改了 JS 就跑 `node --check`。
 3. 开网站实际看一次：简单页、详细页、资料总览；学生列表在 1280 宽的屏幕上不用左右拉。
 4. 改了规则或 `parse_rows`：用三届资料比对改动前后的统计，向维护者报告影响。
-5. 更新说明：`Docs/成就奖计分规则.md`、网页「说明」页（`templates/index.html` 的 tab-help）、`excel.RULES_TEXT`、`README.md`、这份 `CLAUDE.md`、`CHANGELOG.md`。
+5. 更新说明：`docs/成就奖计分规则.md`、网页「说明」页（`templates/index.html` 的 tab-help）、`excel.RULES_TEXT`、`README.md`、这份 `CLAUDE.md`、`CHANGELOG.md`。
 6. 告诉维护者要不要重新打包 exe。
 
 ## 7. 绝对不能做 / 约束
 
 - **不要把学生资料推上 git：** `Result/`、`data/`、`output/`、`logs/` 都是学生个人资料，`.gitignore` 已经排除。exe 也不进 git。
-- **不要自己发明规则。** 规则一律以上级 / 维护者的决定为准（写在 `Docs/成就奖计分规则.md` 的决定记录里）。
+- **不要自己发明规则。** 规则一律以上级 / 维护者的决定为准（写在 `docs/成就奖计分规则.md` 的决定记录里）。
 - **不要用 Prettier 等格式化工具整理 `templates/*.html`**，会弄坏 Jinja 的 `{{ }}`。
 - **`scripts\*.bat` 必须纯 ASCII + CRLF 换行。** 不要写中文，不要改成 LF。`.gitattributes` 已设定 `*.bat text eol=crlf`，git 取出文件时会自动转成 CRLF（git 内部仍存 LF，这是正常的）。
 - **所有设定文件只能放在 `config/`**（测试会检查位置）。不要把 .ini / .json 放回根目录。
@@ -135,7 +135,7 @@ node --check static/app.js static/core.js static/input.js   # 改了 JS 才跑
 - **不要覆盖维护者自己的改动：** 动手前先看文件的最新版本和 `git status`，用合并的方式改。
 - **手动调整文件 `data/成就奖_手动调整.json` 的 key 格式**（学号 | 年份 | 学会 | 栏目 | 条目）不要随便改，改了会让已经存好的「计入 / 不计」全部失效。
 
-## 8. 已确认的重要规则（摘要，细节看 Docs/成就奖计分规则.md）
+## 8. 已确认的重要规则（摘要，细节看 docs/成就奖计分规则.md）
 
 - **标准职称：** 主席、秘书、事务（事务 = 事物 = 总务）、财政（正/副）、查账（不分正副）、总学长（正/副）、助理总学长；没写正副当「正」。
   其它职位写成「执委(XXX)」，有上下文的写成「执委(联课处工委联课表扬大会-事务(副))」这类。
@@ -170,4 +170,4 @@ node --check static/app.js static/core.js static/input.js   # 改了 JS 才跑
   - 服务（数量）= 服务栏条数，扣掉例常，同一年同一项只算 1 个。
   - 年份栏自动；没资料的格子放 0 并标红（留级不标红）。
 - **还没得到上级答复：** 二线执委制服股；校内服务以外栏目的教师节条目；执委(A,B) 算几个、筹委要不要合并；比赛名称那一行算不算；
-  `work.json` 例常清单的大部分条目。详见 `HANDOFF.md` §7 或 `Docs/成就奖计分规则.md` 第八节。
+  `work.json` 例常清单的大部分条目。详见 `HANDOFF.md` §7 或 `docs/成就奖计分规则.md` 第八节。

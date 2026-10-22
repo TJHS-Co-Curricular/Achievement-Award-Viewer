@@ -1,6 +1,6 @@
 # Achievement-Award-Viewer · 成就奖履历查看网站
 
-> 循人中学「高三最高成就奖」统计工具。当前版本见网页底部 / `achievement/__init__.py`，更新记录见 `CHANGELOG.md`，完整计分规则见 `Docs/成就奖计分规则.md`。
+> 循人中学「高三最高成就奖」统计工具。当前版本见网页底部 / `achievement/__init__.py`，更新记录见 `CHANGELOG.md`，完整计分规则见 `docs/成就奖计分规则.md`。
 
 `app.py` 是一个本地小网站，会读取 `Result/` 文件夹里每位学生的「联课活动个人表现履历表」
 （`.xlsx` / `.pdf`），按手册规则统计，在浏览器里显示：
@@ -52,7 +52,7 @@ Achievement-Award-Viewer/
 │   └─ allow_firewall.bat     开防火墙端口（以系统管理员身份执行，只在需要时用）
 ├─ tests/
 │   └─ test_rules.py          自动测试：python -m unittest discover tests -v
-├─ Docs/                   文档：成就奖计分规则.md（完整规则）、履历表指南.md（学生填写范例）、供校对的 Word
+├─ docs/                   文档：成就奖计分规则.md（完整规则）、履历表指南.md（学生填写范例）、供校对的 Word
 ├─ Result/                 你的资料（每位学生一份履历表），不进 git
 │
 │  ↓ 运行时自动产生（python 版和 exe 版一样，都在程序旁边；不进 git）
@@ -197,7 +197,7 @@ exe 用法相同，例如 `Achievement-Award-Viewer.exe "D:\某个地方\Result"
 
 ## 计分规则（摘要）
 
-完整规则见 `Docs/成就奖计分规则.md`（网页「说明」页和 Excel「计分规则」表也有摘要）。实际的判断设定在 `config/` 的
+完整规则见 `docs/成就奖计分规则.md`（网页「说明」页和 Excel「计分规则」表也有摘要）。实际的判断设定在 `config/` 的
 `member_rules.json`（职位）、`award.json`（比赛）、`work.json`（工作）；其它流程在 `achievement/rules.py`。
 
 1. 以班级为单位的内容、服务、活动、比赛不计；学会的筹委、团内工作照算。
