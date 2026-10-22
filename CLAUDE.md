@@ -1,40 +1,28 @@
 # CLAUDE.md —— Achievement-Award-Viewer 项目规范
 
-> Claude Code 每次打开这个项目都会读这份文件。**改了项目结构、规则流程或工作习惯，请同步更新这份文件。**
-> 完整计分规则在 `docs/成就奖计分规则.md`；每个版本改了什么在 `CHANGELOG.md`；一次性交接已归档在 `docs/archive/HANDOFF.md`。
+> 通用规范在全局规则（`~/.claude/rules/zhijie-standard/`），这里**只写本项目特有、或和全局不同的内容**。
+> 和全局不同的地方写在「本项目例外」；改了项目结构、规则流程，请同步更新这份文件。
+> 完整计分规则在 `docs/成就奖计分规则.md`；版本记录在 `CHANGELOG.md`；一次性交接已归档在 `docs/archive/HANDOFF.md`。
 
 ## 1. 项目概要
 
 - **Achievement-Award-Viewer**（启动画面名称 Individual's Utmost Achievement Calculator，成就奖履历查看网站）。
-  维护者：ZhiJie Chong（循人中学 Tsun Jin High School）。当前版本以 `achievement/__init__.py` 的 `__version__` 为准（2026-09-28：1.5.1）。
+  当前版本以 `achievement/__init__.py` 的 `__version__` 为准。
 - 读取 `Result/` 里每位高三学生的「联课活动个人表现履历表」（`.xlsx` / `.pdf`），按**上级**（负责老师）定的规则统计「高三最高成就奖」：
   执委 / 职务数、中层管理数、筹委数、服务时数、服务数量、活动 / 工作 / 比赛、获奖。
   「资料总览」页按学校评审 Google 表格的格式排好每年的数字，让维护者贴进 Google 表格。
-- 交付方式：本地 Flask 网站，用 PyInstaller 打包成单一 exe，给不懂程序的老师双击使用。
 - GitHub：`TJHS-Co-Curricular/Achievement-Award-Viewer`（2026-09-28 起改名，旧名 Individual's Utmost Achievement）。
+- 改规则或 `parse_rows` 后，用 `Result/2024`、`Result/2025`、`Result/2026` 三届资料比对改动前后的统计。
+- 只改 `config/` 的 JSON → 不用重新打包（exe 旁边放 `config\` 会优先采用）。
 
-## 2. 和维护者沟通
+## 2. 技术栈
 
-- **一律用简体中文回复，用词浅白。** 维护者不是专业程序员，说明「改了什么、在哪里、要不要重新打包」就够了，不要长篇技术细节。
-- **规则由上级决定。** 维护者转达上级的修正时照做，**不要自己发明规则**。遇到有歧义、会影响很多学生的情况，先举实际例子问清楚。
-- 每次改完都要告诉维护者：
-  - 网页版按 Ctrl+F5 刷新就行。
-  - 改了 `achievement/`、`static/`、`templates/` → exe 要重新跑 `scripts\build_exe.bat`。
-  - 只改 `config/` 的 JSON → 不用重新打包（exe 旁边放 `config\` 会优先采用）。
-- 改规则或 `parse_rows` 后，用 `Result/2024`、`Result/2025`、`Result/2026` 三届资料比对改动前后的统计，在回报里说明影响几个人、数字怎么变。
-- 维护者的 `todo.md` 是他自己的待办清单，可以读来参考，但要等他在对话里提出才动手。
-
-## 3. 技术栈与版本
-
-- **语言：** Python 3。仓库没有写明最低版本【待确认】；浏览器端是原生 JavaScript（没有框架、没有打包工具）。
 - **依赖**（`requirements.txt`）：`flask>=3.0`、`python-calamine>=0.2`（读 .xlsx）、`pdfplumber>=0.10`（读 .pdf）、`openpyxl>=3.1`（写 Excel）。
-- **打包：** PyInstaller，由 `scripts\build_exe.bat` 在临时 venv `.buildenv` 里安装，`--onefile --console`。
-- **模板：** Jinja2（Flask 自带）。
-- **平台：** 主要在 Windows 使用（exe、.bat）；Python 版可以跨平台运行。
+- **打包：** PyInstaller，由 `scripts\build_exe.bat` 在临时 venv `.buildenv` 里安装，先跑测试再打包。
 - **测试：** 标准库 `unittest`（`tests/test_rules.py`，2026-09-28 有 59 个测试）。
-- **可选工具：** `pyflakes`（Python 静态检查），`node --check`（检查 JS 语法）。
+- 浏览器端是原生 JavaScript（没有框架、没有打包工具）。
 
-## 4. 目录结构
+## 3. 目录结构
 
 ```
 app.py                入口，只有几行 → achievement/cli.py 的 main()
@@ -61,40 +49,31 @@ static/               app.js（界面）、core.js（浏览器端即时重算）
 scripts/              build_exe.bat、start_lan.bat、allow_firewall.bat
 tests/test_rules.py   unittest：规则判断、工作 / 比赛 / 服务时数、资料总览年份、结构（版本号、config 位置、运行时文件夹、路由）
 docs/                 成就奖计分规则.md（完整规则，给上级核对）、履历表指南.md（学生填写范例）、给上级校对的 docx（旧版）
-运行时自动产生（不进 git）：data/（手动调整）、output/（导出）、logs/（日志）—— python 版和 exe 版都放在程序旁边
-Result/               学生履历表（不进 git）。有年份子文件夹（Result/2024、2025、2026）时网站读最新一届
+Result/               学生履历表。有年份子文件夹（Result/2024、2025、2026）时网站读最新一届
 ```
 
-- 设定文件查找顺序（`paths.config_candidates`）：环境变量 → 程序旁边的 `config/` → 程序根目录（旧放法，会提示）→ exe 内置的 `config/`。
 - 规则 JSON 改了会自动重载（mtime 指纹），网页几秒内重算，不用重启。
 
-## 5. 编码规范与命名约定
+## 4. 规则写在哪里、怎么写
 
 - **规则优先写进 JSON，不写进代码：**
   - 职位、执委、筹委、中层管理、会员、不计、★ 标记 → `config/member_rules.json`。共有「一、不计」「二、执委栏移到筹委栏」「三、筹委栏移到执委栏」「三之二、团内工作栏移到执委栏」「四、职位归类」「五、特别标记」几部分，**从上往下找第一条符合的**。
   - 获奖、是否代表本学会 → `config/award.json`。
   - 资料总览的「活动 / 工作」和「服务（数量）」 → `config/work.json`。
-  - 规则字段用中文：`名称`、`包含任一`、`正则`、`并且包含任一`、`不包含`、`学会或内容包含任一`、`适用栏目`、`归类`、`例子`、`备注`。比对时忽略空格和大小写。
-  - 新规则要写明来源和日期：「上级定（YYYY-MM-DD）」或「维护者定（YYYY-MM-DD）」。
+  - 规则字段用中文：`名称`、`包含任一`、`正则`、`并且包含任一`、`不包含`、`学会或内容包含任一`、`适用栏目`、`归类`、`例子`、`备注`。
   - 只有 JSON 做不到的流程（服务时数、B 类、双学会重复、拆句）才改 `achievement/rules.py`。
-- **Python 和浏览器端必须一致：**
+- **Python 和浏览器端必须一致（不要只改一边）：**
   - `static/core.js` 的 `rolesFrom` 要和 Python 的 `standard_roles_from` 结果一致（职务列表、数量、中层管理）。
   - `computeStats` 要和 `rules.compute_stats` 一致。
   - 资料总览的网页版（`input.js`，用 `App.statsFor`）和 Excel 版（`input_sheet.py`，用 `compute_stats`）数字必须一样。
   - 每个 block 预先算好的字段：`b.rc`（职位归类）、`b.ex`（不计原因）、`b.aw`（获奖）、`b.hr`（时数）、`b.sp`、`b.mv`（移栏）、`b.nk`（比对 key）、`b.wk`（1 工作 / 3 活动）、`b.wr`（说明）、`b.sc`（服务数量：1 算 / 0 例常 / 2 同年已算过）。
 - **内部栏目 key：** `role` 执委 / 职务、`comm` 筹委、`extComp` / `intComp` 校外 / 校内比赛、`extAct` / `intAct` 活动、`extSvc` / `intSvc` 服务、`total` 总服务时数、`team` 团内工作/表演、`badge` 考章、`honor` 团内荣誉。
-- **日志：** 新代码用 `logging.getLogger(__name__)` 记录重要事件和错误，不要只用 `print`。
-- **注释和用户看到的文字用简体中文；** 函数名、变量名用英文（照现有写法）。
-- **测试：** 每条上级确认的规则都要在 `tests/test_rules.py` 加一个测试。
-- **版本号**（语义化版本）：修 bug、规则微调 +0.0.1；新功能、改界面 +0.1.0；结构大改 +1.0.0。
-  只改 `achievement/__init__.py` 的 `__version__`，同时在 `CHANGELOG.md` 最上面加一段（测试会检查）。只改 `config/` 规则不用改版本号。
+- 每条上级确认的规则都要在 `tests/test_rules.py` 加一个测试。
 
-## 6. 运行、测试、部署
+## 5. 运行与检查
 
 ```bash
-pip install -r requirements.txt
-
-python app.py                    # 开网站（自动开浏览器，预设 http://127.0.0.1:5000）
+python app.py                    # 开网站（自动开浏览器，默认 http://127.0.0.1:5000）
 python app.py D:\某个\Result      # 指定 Result 文件夹
 python app.py --lan              # 局域网共享（也可以在 config.ini 设 access = lan）
 python app.py --port 5050 --no-browser
@@ -104,36 +83,28 @@ python app.py --list-roles       # output/已知职位一览.xlsx
 python app.py --list-awards      # output/已知获奖一览.xlsx
 python app.py --version
 
-python -m unittest discover tests -v          # 测试（必须全部 OK）
-python -m pyflakes app.py achievement         # 有装才跑
-node --check static/app.js static/core.js static/input.js   # 改了 JS 才跑
+python -m unittest discover tests -v
+node --check static/app.js static/core.js static/input.js
 ```
 
-- **打包 exe（Windows）：** 双击或运行 `scripts\build_exe.bat`，会在项目根目录产生 `Achievement-Award-Viewer.exe`。
-  exe 可携带：把 exe、`Result` 文件夹（需要时再加 `config\`）拷到别的 Windows 电脑，双击就能用。
 - **局域网：** `scripts\start_lan.bat`；第一次要用 `scripts\allow_firewall.bat` 开放防火墙。
 - **排查问题**（读取失败、闪退）：先看 `logs/app.log`。
+- 开网站要看：简单页、详细页、资料总览。
+- 改了规则要一起更新：`docs/成就奖计分规则.md`、网页「说明」页（`templates/index.html` 的 tab-help）、`excel.RULES_TEXT`。
 
-### 改完的检查清单
-1. `python -m unittest discover tests -v` 全部 OK。
-2. 有装 pyflakes 就跑一次，没有警告；改了 JS 就跑 `node --check`。
-3. 开网站实际看一次：简单页、详细页、资料总览；学生列表在 1280 宽的屏幕上不用左右拉。
-4. 改了规则或 `parse_rows`：用三届资料比对改动前后的统计，向维护者报告影响。
-5. 更新说明：`docs/成就奖计分规则.md`、网页「说明」页（`templates/index.html` 的 tab-help）、`excel.RULES_TEXT`、`README.md`、这份 `CLAUDE.md`、`CHANGELOG.md`。
-6. 告诉维护者要不要重新打包 exe。
+## 6. 本项目例外（和全局规则不同的地方）
 
-## 7. 绝对不能做 / 约束
+- 没有 C 类例外。
 
-- **不要把学生资料推上 git：** `Result/`、`data/`、`output/`、`logs/` 都是学生个人资料，`.gitignore` 已经排除。exe 也不进 git。
-- **不要自己发明规则。** 规则一律以上级 / 维护者的决定为准（写在 `docs/成就奖计分规则.md` 的决定记录里）。
-- **不要用 Prettier 等格式化工具整理 `templates/*.html`**，会弄坏 Jinja 的 `{{ }}`。
-- **`scripts\*.bat` 必须纯 ASCII + CRLF 换行。** 不要写中文，不要改成 LF。`.gitattributes` 已设定 `*.bat text eol=crlf`，git 取出文件时会自动转成 CRLF（git 内部仍存 LF，这是正常的）。
-- **所有设定文件只能放在 `config/`**（测试会检查位置）。不要把 .ini / .json 放回根目录。
-- **版本号只在 `achievement/__init__.py` 改**，不要在别处写死。
-- **JSON 规则文件给非程序员手改：** 保持中文字段名和「说明」段，不要改字段名或结构；改结构要同时改对应的 `*_rules.py` 并保持向下兼容。
-- **不要单独改 Python 端或 JS 端的计分逻辑。** 两边必须同时改，结果一致。
-- **不要覆盖维护者自己的改动：** 动手前先看文件的最新版本和 `git status`，用合并的方式改。
-- **手动调整文件 `data/成就奖_手动调整.json` 的 key 格式**（学号 | 年份 | 学会 | 栏目 | 条目）不要随便改，改了会让已经存好的「计入 / 不计」全部失效。
+### 暂未对齐（B 类，以后再做；不是例外，不要擅自改）
+
+- 日志是 `logs/app.log` 轮替（1MB×5），全局要求每天一个文件。
+
+## 7. 绝对不能改
+
+1. **JSON 规则文件的中文字段名和「说明」段**：不要改字段名或结构；改结构要同时改对应的 `*_rules.py` 并保持向下兼容。
+2. **手动调整文件 `data/成就奖_手动调整.json` 的 key 格式**（学号 | 年份 | 学会 | 栏目 | 条目），改了会让已经存好的「计入 / 不计」全部失效。
+3. 规则决定记录在 `docs/成就奖计分规则.md`，以那里为准。
 
 ## 8. 已确认的重要规则（摘要，细节看 docs/成就奖计分规则.md）
 
@@ -169,5 +140,19 @@ node --check static/app.js static/core.js static/input.js   # 改了 JS 才跑
   - 工作 = 服务栏条数（每条都算）；活动 = 比赛和服务以外的栏目一律算；比赛 = 比赛栏条数（参加就算）。
   - 服务（数量）= 服务栏条数，扣掉例常，同一年同一项只算 1 个。
   - 年份栏自动；没资料的格子放 0 并标红（留级不标红）。
-- **还没得到上级答复：** 二线执委制服股；校内服务以外栏目的教师节条目；执委(A,B) 算几个、筹委要不要合并；比赛名称那一行算不算；
-  `work.json` 例常清单的大部分条目。详见 `docs/archive/HANDOFF.md` §7 或 `docs/成就奖计分规则.md` 第八节。
+
+## 9. 待确认（不要自行定案；来自 2026-10-16 交接）
+
+**问上级（规则）**
+1. 维护者 v1.4.0 把工作定成「服务栏每一条都算」。这取消了上级 9/28 回复的「只是参与者不算工作」「营员算活动」（营员写在服务栏的，现在算工作）。上级知道并同意吗？
+2. 「二线执委--制服股」算不算中层管理。
+3. 校内服务以外栏目的教师节条目怎么算。
+4. 执委(A,B) 算 2 个？筹委每条算 1 项，还是要合并？
+5. 比赛一行算一个：先写比赛名称、下面再列项目时，名称那一行也会算一个，这样对吗？
+6. 活动栏的「交流」要不要算工作。照 v1.4.0 的定义，活动栏一律算活动，这一条可能可以关掉。
+7. `work.json`「服务（数量）」的例常清单（早操、日常 / 例常、每周 / 每月、保健室、图书馆轮值、回收、鱼菜共生、仪容检查）和「大扫除算同一类」都标着「待上级确认」。只有「周会」和「搬椅子」是维护者定的。
+
+**问维护者**
+8. `work.json` 的活动栏目包括「考章」「团内荣誉」，要保留吗？
+9. 「参与奖」改成不算获奖，可以吗？
+10. 「联课活动处工委」的显示问题要修吗？（要修就得重新打包）
