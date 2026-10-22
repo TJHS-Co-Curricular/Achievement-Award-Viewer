@@ -1,7 +1,7 @@
 # CLAUDE.md —— Achievement-Award-Viewer 项目规范
 
 > Claude Code 每次打开这个项目都会读这份文件。**改了项目结构、规则流程或工作习惯，请同步更新这份文件。**
-> 完整计分规则在 `docs/成就奖计分规则.md`；每个版本改了什么在 `CHANGELOG.md`；一次性交接在 `HANDOFF.md`（如果还在）。
+> 完整计分规则在 `docs/成就奖计分规则.md`；每个版本改了什么在 `CHANGELOG.md`；一次性交接已归档在 `docs/archive/HANDOFF.md`。
 
 ## 1. 项目概要
 
@@ -170,4 +170,4 @@ node --check static/app.js static/core.js static/input.js   # 改了 JS 才跑
   - 服务（数量）= 服务栏条数，扣掉例常，同一年同一项只算 1 个。
   - 年份栏自动；没资料的格子放 0 并标红（留级不标红）。
 - **还没得到上级答复：** 二线执委制服股；校内服务以外栏目的教师节条目；执委(A,B) 算几个、筹委要不要合并；比赛名称那一行算不算；
-  `work.json` 例常清单的大部分条目。详见 `HANDOFF.md` §7 或 `docs/成就奖计分规则.md` 第八节。
+  `work.json` 例常清单的大部分条目。详见 `docs/archive/HANDOFF.md` §7 或 `docs/成就奖计分规则.md` 第八节。
