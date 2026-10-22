@@ -33,8 +33,8 @@ achievement/
   store.py            Store：读取 Result（指纹变了才重读）、手动调整 data/成就奖_手动调整.json
   input_sheet.py      「资料总览」页：按评审表格式排列的统计（栏位、排序、每年数字、Excel）
   paths.py            ★ 所有文件夹位置：APP_DIR / RESOURCE_DIR、config 查找顺序、data/output/logs、旧文件搬迁
-  logs.py             logs/app.log（RotatingFileHandler 1MB×5），未捕获的错误也写进去
-  settings.py         读取 config/config.ini（[server] [data] [input_sheet]）
+  logs.py             logs/app-YYYY-MM-DD.log（每天一个，按 [log] keep_days 清理），未捕获的错误也写进去
+  settings.py         读取 config/config.ini（[server] [data] [input_sheet] [log]）；缺 [log] 时补在文件末尾（只补不改）
   reader.py           读 .xlsx（python-calamine）/ .pdf（pdfplumber）
   rules.py            计分流程：parse_rows、clean_role、classify_role、standard_roles_from、move_event_roles、
                       compute_exclusions、parse_hours、_mark_work、_mark_svc、compute_stats …
@@ -88,17 +88,13 @@ node --check static/app.js static/core.js static/input.js
 ```
 
 - **局域网：** `scripts\start_lan.bat`；第一次要用 `scripts\allow_firewall.bat` 开放防火墙。
-- **排查问题**（读取失败、闪退）：先看 `logs/app.log`。
+- **排查问题**（读取失败、闪退）：先看 `logs/app-YYYY-MM-DD.log`（出事那天的）。
 - 开网站要看：简单页、详细页、资料总览。
 - 改了规则要一起更新：`docs/成就奖计分规则.md`、网页「说明」页（`templates/index.html` 的 tab-help）、`excel.RULES_TEXT`。
 
 ## 6. 本项目例外（和全局规则不同的地方）
 
 - 没有 C 类例外。
-
-### 暂未对齐（B 类，以后再做；不是例外，不要擅自改）
-
-- 日志是 `logs/app.log` 轮替（1MB×5），全局要求每天一个文件。
 
 ## 7. 绝对不能改
 

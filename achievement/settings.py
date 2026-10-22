@@ -23,6 +23,8 @@ class Settings:
     lan_allow_edit: bool = False
     result_folder: str = "Result"
     output_folder: str = "output"
+    log_level: str = "info"        # 日志详细程度：debug / info / warning / error
+    log_keep_days: int = 30        # 日志保留天数
     # 「资料总览」页的年份栏：预设自动（Result 里最新的年份 = 第一个年级，往前推）
     sheet_title: str = "最高成就奖评审"
     sheet_years: list | None = None     # None = 自动；手动时是 [(年份, 年级), ...]
@@ -77,6 +79,19 @@ def load() -> Settings:
     st.lan_allow_edit = _bool(srv.get("lan_allow_edit", "no"), False, "lan_allow_edit", w)
     st.result_folder = str(data.get("result_folder", st.result_folder)).strip() or "Result"
     st.output_folder = str(data.get("output_folder", st.output_folder)).strip() or "output"
+    lg = cp["log"] if cp.has_section("log") else {}
+    lv = str(lg.get("level", st.log_level)).strip().lower()
+    if lv in ("debug", "info", "warning", "error"):
+        st.log_level = lv
+    else:
+        w.append(f"[log] level = {lv} 看不懂（要写 debug / info / warning / error），改用 info")
+    try:
+        kd = int(str(lg.get("keep_days", st.log_keep_days)).strip())
+        if kd < 1:
+            raise ValueError
+        st.log_keep_days = kd
+    except ValueError:
+        w.append(f"[log] keep_days = {lg.get('keep_days')} 不是 1 以上的整数，改用 30")
     sh = cp["input_sheet"] if cp.has_section("input_sheet") else {}
     st.sheet_title = str(sh.get("title", st.sheet_title)).strip() or st.sheet_title
     if str(sh.get("years", "auto")).strip().lower() in ("", "auto", "自动"):
@@ -109,3 +124,36 @@ def load() -> Settings:
     if "optional_grades" in sh:
         st.sheet_optional_grades = split(sh.get("optional_grades"))
     return st
+
+
+# 老师的 config.ini 缺 [log] 区段时，补在文件末尾（只补不改：已经写好的内容一个字都不动）
+LOG_SECTION = """
+[log]
+; 日志详细程度：debug / info / warning / error（平时用 info；debug 会连每次网页请求都记下来）
+level = info
+; 日志保留天数（logs 文件夹里 app-年-月-日.log 每天一个文件，超过这么多天的启动时自动删除）
+keep_days = 30
+"""
+
+
+def add_missing_sections(path: Path) -> list[str]:
+    """config.ini 没有 [log] 区段就在末尾补上默认值和注释。返回说明文字（给启动画面用）；
+    已经有就什么都不做。写不进去（只读）时返回提示，不会中断程序。"""
+    try:
+        raw = Path(path).read_bytes()
+        cp = configparser.ConfigParser(inline_comment_prefixes=(";", "#"), interpolation=None)
+        cp.read_string(raw.decode("utf-8-sig"))
+    except (OSError, UnicodeDecodeError, configparser.Error):
+        return []
+    if cp.has_section("log"):
+        return []
+    nl = "\r\n" if b"\r\n" in raw else "\n"    # 跟着原文件的换行方式（记事本存的是 CRLF）
+    text = LOG_SECTION.replace("\n", nl)
+    if raw and not raw.endswith(b"\n"):
+        text = nl + text
+    try:
+        with open(path, "a", encoding="utf-8", newline="") as f:
+            f.write(text)
+    except OSError as e:
+        return [f"config.ini 缺 [log] 区段，但写不进去（{e}），先用默认值"]
+    return ["config.ini 原本没有 [log] 区段，已在文件末尾补上默认值（其它设置没有改动）"]

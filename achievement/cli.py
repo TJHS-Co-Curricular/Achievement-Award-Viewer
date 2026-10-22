@@ -21,10 +21,11 @@ import socket
 import sys
 import threading
 import webbrowser
+from pathlib import Path
 
 from . import APP_NAME, __version__, logs, paths
 from .engine import current_folder
-from .settings import load as load_settings
+from .settings import add_missing_sections, load as load_settings
 from .store import Store
 from .web import create_app, export_files, write_reference
 
@@ -114,7 +115,10 @@ def main(argv=None):
     dev = args.dev or os.environ.get("ACHIEVEMENT_VIEWER_DEBUG") == "1"
 
     dirs = paths.make_dirs(args.folder or settings.result_folder, settings.output_folder)
-    log_file = logs.setup(dirs.logs, dev)
+    log_file = logs.setup(dirs.logs, dev, settings.log_level, settings.log_keep_days)
+    added = []
+    if settings.source and not (paths.FROZEN and paths.RESOURCE_DIR in Path(settings.source).resolve().parents):
+        added = add_missing_sections(settings.source)   # 打包在 exe 里的那份不能改，只补 exe 旁边的
     moved = paths.migrate_legacy(dirs)
     store = Store(dirs)
     app = create_app(store, settings)
@@ -131,12 +135,16 @@ def main(argv=None):
     for w in settings.warnings:
         print(f" [!] config.ini：{w}")
         log.warning("config.ini：%s", w)
+    for n in added:
+        print(f" [i] {n}")
+        log.info(n)
     print(f" 资料来源 (Result):  {dirs.result}")
     if current_folder(dirs.result) != dirs.result:
         print(f"   Result 里是年份子文件夹 → 网站读取最新一届：{current_folder(dirs.result).name}")
     print(f" 手动调整 (data):    {dirs.overrides}")
     print(f" 导出 (output):      {dirs.output}")
-    print(f" 日志 (logs):        {log_file or '（无法写入）'}")
+    print(f" 日志 (logs):        {log_file or '（无法写入）'}"
+          + (f"（保留 {settings.log_keep_days} 天）" if log_file else ""))
     for n in moved:
         print(f" [i] {n}")
         log.info(n)

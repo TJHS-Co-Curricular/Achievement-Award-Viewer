@@ -5,7 +5,7 @@
     ├─ Result/    学生履历表（输入）
     ├─ data/      程序自己保存的资料：成就奖_手动调整.json（网页里的「计入 / 不计」）
     ├─ output/    导出的文件：离线版 HTML、Excel、已知职位一览、已知获奖一览
-    └─ logs/      运行日志 app.log（出问题时把它发给维护的人）
+    └─ logs/      运行日志 app-YYYY-MM-DD.log，每天一个（出问题时把它发给维护的人）
 
 RESOURCE_DIR 是 templates/、static/、内置 config/ 所在的位置（exe 版是打包解压出来的临时文件夹）。
 """

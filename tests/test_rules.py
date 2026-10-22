@@ -509,5 +509,90 @@ class Structure(unittest.TestCase):
             self.assertEqual(c.get("/export/input.xlsx").status_code, 200)
 
 
+class Logs(unittest.TestCase):
+    """日志每天一个文件 logs/app-YYYY-MM-DD.log，按 [log] keep_days 清理（全局规范 50-logging，维护者定 2026-10-23）。"""
+
+    def test_daily_file_and_midnight_switch(self):
+        import datetime as dt
+        import logging
+        import tempfile
+        from achievement import logs
+        with tempfile.TemporaryDirectory() as tmp:
+            day = [dt.date(2026, 10, 22)]
+            h = logs.DailyFileHandler(Path(tmp), today=lambda: day[0])
+            h.setFormatter(logging.Formatter("%(message)s"))
+            rec = lambda m: logging.LogRecord("t", logging.INFO, __file__, 1, m, None, None)
+            h.emit(rec("第一天"))
+            day[0] = dt.date(2026, 10, 23)          # 程序开着过了午夜
+            h.emit(rec("第二天"))
+            h.close()
+            self.assertEqual((Path(tmp) / "app-2026-10-22.log").read_text(encoding="utf-8").strip(), "第一天")
+            self.assertEqual((Path(tmp) / "app-2026-10-23.log").read_text(encoding="utf-8").strip(), "第二天")
+
+    def test_cleanup_keeps_recent_and_other_files(self):
+        import datetime as dt
+        import tempfile
+        from achievement import logs
+        with tempfile.TemporaryDirectory() as tmp:
+            t = Path(tmp)
+            names = ["app-2026-09-22.log", "app-2026-09-23.log", "app-2026-10-23.log",
+                     "app.log", "app.log.1", "audit.log", "app-坏名字.log"]
+            for n in names:
+                (t / n).write_text("x", encoding="utf-8")
+            removed = logs.cleanup(t, 30, today=dt.date(2026, 10, 23))
+            self.assertEqual([p.name for p in removed], ["app-2026-09-22.log"])   # 31 天前的才删
+            self.assertEqual(sorted(p.name for p in t.iterdir()), sorted(names[1:]))
+
+    def _load(self, text):
+        import os
+        import tempfile
+        from achievement import settings
+        import shutil
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, True)
+        p = Path(tmp) / "config.ini"
+        p.write_bytes(text.encode("utf-8"))
+        old = os.environ.get("ACHIEVEMENT_CONFIG")
+        os.environ["ACHIEVEMENT_CONFIG"] = str(p)
+        try:
+            return p, settings.load()
+        finally:
+            if old is None:
+                os.environ.pop("ACHIEVEMENT_CONFIG", None)
+            else:
+                os.environ["ACHIEVEMENT_CONFIG"] = old
+
+    def test_log_settings(self):
+        _, st = self._load("[server]\r\nport = 5000\r\n")
+        self.assertEqual((st.log_level, st.log_keep_days, st.warnings), ("info", 30, []))   # 没写 = 默认
+        _, st = self._load("[log]\nlevel = DEBUG\nkeep_days = 7\n")
+        self.assertEqual((st.log_level, st.log_keep_days), ("debug", 7))
+        _, st = self._load("[log]\nlevel = 很多\nkeep_days = 0\n")              # 写错 → 默认 + 提示
+        self.assertEqual((st.log_level, st.log_keep_days), ("info", 30))
+        self.assertEqual(len(st.warnings), 2)
+
+    def test_add_missing_log_section_only_appends(self):
+        from achievement import settings
+        original = "﻿[server]\r\n; 老师的注释\r\nport = 5050\r\naccess = lan"   # 记事本：BOM + CRLF，最后没换行
+        p, _ = self._load(original)
+        self.assertTrue(settings.add_missing_sections(p))
+        raw = p.read_bytes()
+        self.assertTrue(raw.startswith(original.encode("utf-8")))                   # 原来的内容一个字都没改
+        self.assertNotIn(b"\n", raw.replace(b"\r\n", b""))                         # 补上的也用 CRLF
+        _, st = self._load(raw.decode("utf-8-sig"))
+        self.assertEqual((st.port, st.access, st.log_keep_days, st.warnings), (5050, "lan", 30, []))
+        self.assertEqual(settings.add_missing_sections(p), [])                     # 已经有 [log] → 不再动
+        self.assertEqual(p.read_bytes(), raw)
+        p2, _ = self._load("[log]\nkeep_days = 7\n")                                # 有 [log] 但缺 level → 不补，用默认
+        self.assertEqual(settings.add_missing_sections(p2), [])
+
+    def test_default_config_has_log_section(self):
+        import configparser
+        cp = configparser.ConfigParser(inline_comment_prefixes=(";",), interpolation=None)
+        cp.read(ROOT / "config" / "config.ini", encoding="utf-8-sig")
+        self.assertEqual(cp["log"]["level"], "info")
+        self.assertEqual(cp["log"]["keep_days"], "30")
+
+
 if __name__ == "__main__":
     unittest.main()

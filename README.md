@@ -35,7 +35,7 @@ Achievement-Award-Viewer/
 │   ├─ store.py               网站资料：读取 Result（有变动才重读）、手动调整
 │   ├─ input_sheet.py         「资料总览」页（评审表格式）的栏位与 Excel
 │   ├─ paths.py               所有文件夹位置（config / Result / data / output / logs）
-│   ├─ logs.py                运行日志 logs/app.log
+│   ├─ logs.py                运行日志 logs/app-年-月-日.log（每天一个）
 │   ├─ settings.py            读取 config/config.ini
 │   ├─ reader.py              读取 .xlsx（python-calamine）与 .pdf（pdfplumber）
 │   ├─ rules.py               计分流程（服务时数、B 类、双学会重复等），职位 / 比赛部分照 config/ 执行
@@ -58,7 +58,7 @@ Achievement-Award-Viewer/
 │  ↓ 运行时自动产生（python 版和 exe 版一样，都在程序旁边；不进 git）
 ├─ data/                   成就奖_手动调整.json（网页里的「计入 / 不计」）
 ├─ output/                 导出：离线版 HTML、Excel、资料总览 Excel、已知职位一览、已知获奖一览
-├─ logs/                   运行日志 app.log（出问题时把它发给维护的人）
+├─ logs/                   运行日志 app-年-月-日.log，每天一个（出问题时把那天的文件发给维护的人）
 │
 ├─ CHANGELOG.md            更新记录（每个版本改了什么）
 ├─ CLAUDE.md               给 AI 助手（Claude）看的项目说明，换电脑也能接着做
@@ -72,8 +72,10 @@ Achievement-Award-Viewer/
 **版本号**：写在 `achievement/__init__.py`，网页底部、启动画面、日志都会显示；`python app.py --version` 也可以看。
 每次改版在 `CHANGELOG.md` 记一笔。
 
-**日志**：`logs/app.log` 记录启动、每次载入、读取失败的文件、手动调整、导出和所有错误（满 1 MB 自动换新，保留 5 个）。
-网页出现「读取失败」或程序闪退时，先看这个文件。`--dev` 会连每次网页请求也记下来。
+**日志**：`logs/app-年-月-日.log`（例：`logs/app-2026-10-23.log`，每天一个文件）记录启动、每次载入、读取失败的文件、手动调整、导出和所有错误。
+超过 30 天的日志启动时自动删除；保留几天、记多详细，在 `config/config.ini` 的 `[log]` 改（`keep_days`、`level`），改完重新启动。
+网页出现「读取失败」或程序闪退时，先看出事那天的文件。`--dev` 或 `level = debug` 会连每次网页请求也记下来。
+旧版留下的 `logs/app.log`、`app.log.1`… 不会自动删除，不需要的话可以自己删掉。
 
 **Result 里放年份子文件夹**（例：`Result/2025/`、`Result/2026/`）：网站读取最新一届（名称最大的那个文件夹）；
 「下载职位一览 / 获奖一览」（`--list-roles` / `--list-awards`）会读全部届别，每一届的出现次数另列一栏（`2025届`、`2026届`）。
