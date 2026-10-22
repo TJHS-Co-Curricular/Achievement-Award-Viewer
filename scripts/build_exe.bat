@@ -26,25 +26,29 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo [1/5] Creating a throwaway virtual environment ".buildenv" ...
+echo [1/6] Creating a throwaway virtual environment ".buildenv" ...
 python -m venv .buildenv
 if errorlevel 1 goto :fail
 
-echo [2/5] Installing flask, python-calamine, pdfplumber, openpyxl and pyinstaller ...
+echo [2/6] Installing flask, python-calamine, pdfplumber, openpyxl and pyinstaller ...
 .buildenv\Scripts\python.exe -m pip install --upgrade pip -q
 if errorlevel 1 goto :fail
 .buildenv\Scripts\python.exe -m pip install -r requirements.txt pyinstaller -q
 if errorlevel 1 goto :fail
 
-echo [3/5] Building the EXE, this can take a minute or two ...
+echo [3/6] Running tests, the EXE is built only if all tests pass ...
+.buildenv\Scripts\python.exe -m unittest discover -s tests
+if errorlevel 1 goto :testfail
+
+echo [4/6] Building the EXE, this can take a minute or two ...
 .buildenv\Scripts\python.exe -m PyInstaller --onefile --console --name "Achievement-Award-Viewer" --add-data "%ROOT%\templates;templates" --add-data "%ROOT%\static;static" --add-data "%ROOT%\config;config" --collect-data pdfminer --collect-submodules python_calamine --exclude-module tkinter --exclude-module numpy --exclude-module pandas --distpath . --workpath .buildwork --specpath .buildwork app.py
 if errorlevel 1 goto :fail
 
-echo [4/5] Cleaning up build files ...
+echo [5/6] Cleaning up build files ...
 rmdir /s /q .buildwork >nul 2>nul
 rmdir /s /q .buildenv >nul 2>nul
 
-echo [5/5] Done!
+echo [6/6] Done!
 echo.
 echo ============================================================
 echo  "Achievement-Award-Viewer.exe" is ready in the project folder.
@@ -57,6 +61,15 @@ echo.
 pause
 popd
 exit /b 0
+
+:testfail
+echo.
+echo [ERROR] Some tests failed, so the EXE was NOT built. See the messages above.
+rmdir /s /q .buildwork >nul 2>nul
+rmdir /s /q .buildenv >nul 2>nul
+pause
+popd
+exit /b 1
 
 :fail
 echo.
